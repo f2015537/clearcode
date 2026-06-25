@@ -14,7 +14,7 @@ This is not a tutorial and not a clone. It is a rigorous, build-in-public engine
 
 Modern coding agents are surprisingly opaque. The surface area of the problem is wide: context retrieval, tool orchestration, agent reasoning, safety constraints, freshness management, and evaluation — each of which is a non-trivial engineering problem in its own right. Building one end-to-end is the most direct path to genuinely understanding the design space.
 
-The companion blog series at [blog.divyampatro.dev](https://blog.divyampatro.dev) documents every tradeoff and decision in writing, because building something and being able to explain it clearly are two different skills worth practicing together.
+The companion blog series at [blog.divyampatro.dev/series/clearcode](https://blog.divyampatro.dev/series/clearcode) documents every tradeoff and decision in writing, because building something and being able to explain it clearly are two different skills worth practicing together.
 
 ---
 

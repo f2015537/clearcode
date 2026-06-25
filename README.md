@@ -59,6 +59,8 @@ The eval layer is first-class, not an afterthought. Retrieval quality, context q
 
 ## Series
 
+Full series index: [blog.divyampatro.dev/series/clearcode](https://blog.divyampatro.dev/series/clearcode)
+
 | Part | Topic | Status |
 |------|-------|--------|
 | 1 | Architecture and design decisions before writing any code | [Published](https://blog.divyampatro.dev/clearcode-part-1-reverse-engineering-a-coding-agent-before-writing-a-single-line-of-code) |
@@ -83,4 +85,4 @@ The stack is intentionally minimal at the start and grows only when a new layer 
 
 Active development. The architecture is defined; implementation begins at the context layer and proceeds upward. Each part of the series ships with working code and a companion post.
 
-Follow along: [blog.divyampatro.dev](https://blog.divyampatro.dev)
+Follow along: [blog.divyampatro.dev/series/clearcode](https://blog.divyampatro.dev/series/clearcode)

@@ -1,0 +1,227 @@
+<svg width="1200" height="600" viewBox="0 0 1200 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="0.5" cy="0.5" r="0.65" fill="#21262d"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="600" fill="#0d1117"/>
+  <rect width="1200" height="600" fill="url(#dots)"/>
+
+  <!-- Panel separator -->
+  <line x1="420" y1="44" x2="420" y2="556" stroke="#21262d" stroke-width="1"/>
+
+  <!-- ======================== -->
+  <!-- LEFT PANEL: BRANDING     -->
+  <!-- ======================== -->
+
+  <!-- "BUILD-IN-PUBLIC" eyebrow -->
+  <text x="48" y="165"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="11" font-weight="600" fill="#58a6ff" letter-spacing="2.5">BUILD-IN-PUBLIC</text>
+
+  <!-- Title -->
+  <text x="48" y="226"
+    font-family="'Courier New', Courier, monospace"
+    font-size="56" font-weight="700" fill="#e6edf3" letter-spacing="-2">ClearCode</text>
+
+  <!-- Blue accent underline -->
+  <rect x="48" y="238" width="258" height="2.5" rx="1.25" fill="#58a6ff"/>
+
+  <!-- Tagline -->
+  <text x="48" y="272"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="14" fill="#8b949e">Reverse-engineering a</text>
+  <text x="48" y="292"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="14" fill="#8b949e">production coding agent</text>
+  <text x="48" y="312"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="14" fill="#8b949e">from scratch.</text>
+
+  <!-- Divider -->
+  <line x1="48" y1="338" x2="372" y2="338" stroke="#21262d" stroke-width="1"/>
+
+  <!-- Stack label -->
+  <text x="48" y="362"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="10" font-weight="600" fill="#3d444d" letter-spacing="2">STACK</text>
+
+  <!-- Stack chips -->
+  <rect x="48" y="374" width="72" height="24" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="84" y="391"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="11" fill="#e6edf3" text-anchor="middle">Python</text>
+
+  <rect x="130" y="374" width="92" height="24" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="176" y="391"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="11" fill="#e6edf3" text-anchor="middle">LangGraph</text>
+
+  <rect x="232" y="374" width="54" height="24" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="259" y="391"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="11" fill="#e6edf3" text-anchor="middle">MCP</text>
+
+  <rect x="296" y="374" width="60" height="24" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="326" y="391"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="11" fill="#e6edf3" text-anchor="middle">RAGAS</text>
+
+  <!-- Blog URL -->
+  <text x="48" y="452"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="13" fill="#58a6ff">blog.divyampatro.dev</text>
+
+  <!-- ========================= -->
+  <!-- RIGHT PANEL: ARCHITECTURE -->
+  <!-- ========================= -->
+
+  <!-- Panel heading -->
+  <text x="810" y="40"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="10" font-weight="600" fill="#3d444d" text-anchor="middle" letter-spacing="3">SYSTEM ARCHITECTURE</text>
+
+  <!-- ── CONTEXT LAYER ── -->
+  <rect x="444" y="54" width="726" height="74" rx="8" fill="#0e0720" stroke="#7c3aed" stroke-width="1.5" stroke-opacity="0.85"/>
+  <rect x="444" y="54" width="4" height="74" rx="2" fill="#7c3aed"/>
+  <text x="462" y="79"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="10" font-weight="600" fill="#a78bfa" letter-spacing="2">CONTEXT LAYER</text>
+  <text x="462" y="112"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="14" fill="#c9d1d9">Indexers</text>
+  <text x="560" y="112"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="14" fill="#30363d">·</text>
+  <text x="576" y="112"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="14" fill="#c9d1d9">Retrievers</text>
+  <text x="684" y="112"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="14" fill="#30363d">·</text>
+  <text x="700" y="112"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="14" fill="#c9d1d9">Memory</text>
+
+  <!-- Arrow 1 -->
+  <line x1="810" y1="128" x2="810" y2="142" stroke="#21262d" stroke-width="1.5"/>
+  <polygon points="810,150 804,140 816,140" fill="#21262d"/>
+
+  <!-- ── AGENT REASONING ── -->
+  <rect x="444" y="152" width="726" height="64" rx="8" fill="#040e26" stroke="#3b82f6" stroke-width="1.5" stroke-opacity="0.85"/>
+  <rect x="444" y="152" width="4" height="64" rx="2" fill="#3b82f6"/>
+  <text x="462" y="176"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="10" font-weight="600" fill="#60a5fa" letter-spacing="2">AGENT REASONING</text>
+  <text x="462" y="206"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="14" fill="#c9d1d9">LangGraph</text>
+  <text x="556" y="206"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="14" fill="#30363d">·</text>
+  <text x="570" y="206"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="14" fill="#c9d1d9">Planning</text>
+  <text x="648" y="206"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="14" fill="#30363d">·</text>
+  <text x="662" y="206"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="14" fill="#c9d1d9">Tool Dispatch</text>
+
+  <!-- Arrow 2 -->
+  <line x1="810" y1="216" x2="810" y2="230" stroke="#21262d" stroke-width="1.5"/>
+  <polygon points="810,238 804,228 816,228" fill="#21262d"/>
+
+  <!-- ── TOOLS / SKILLS / MCP ── -->
+  <!-- col widths: (726 - 2*16) / 3 = 694/3 = 231.3 → 231, 231, 232 -->
+  <!-- col1: x=444, w=231 → center=559 -->
+  <rect x="444" y="240" width="231" height="58" rx="8" fill="#130c00" stroke="#d97706" stroke-width="1.5" stroke-opacity="0.85"/>
+  <text x="559" y="264"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="10" font-weight="600" fill="#fbbf24" letter-spacing="2" text-anchor="middle">TOOLS</text>
+  <text x="559" y="286"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="12" fill="#6e7681" text-anchor="middle">Discrete functions</text>
+
+  <!-- col2: x=691, w=231 → center=806 -->
+  <rect x="691" y="240" width="231" height="58" rx="8" fill="#130c00" stroke="#d97706" stroke-width="1.5" stroke-opacity="0.85"/>
+  <text x="806" y="264"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="10" font-weight="600" fill="#fbbf24" letter-spacing="2" text-anchor="middle">SKILLS</text>
+  <text x="806" y="286"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="12" fill="#6e7681" text-anchor="middle">Composed capabilities</text>
+
+  <!-- col3: x=938, w=232 → center=1054 -->
+  <rect x="938" y="240" width="232" height="58" rx="8" fill="#130c00" stroke="#d97706" stroke-width="1.5" stroke-opacity="0.85"/>
+  <text x="1054" y="264"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="10" font-weight="600" fill="#fbbf24" letter-spacing="2" text-anchor="middle">MCP</text>
+  <text x="1054" y="286"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="12" fill="#6e7681" text-anchor="middle">Server integrations</text>
+
+  <!-- Arrow 3 -->
+  <line x1="810" y1="298" x2="810" y2="312" stroke="#21262d" stroke-width="1.5"/>
+  <polygon points="810,320 804,310 816,310" fill="#21262d"/>
+
+  <!-- ── LLM PROVIDER ── -->
+  <rect x="444" y="322" width="726" height="52" rx="8" fill="#0a0e15" stroke="#475569" stroke-width="1.5" stroke-opacity="0.85"/>
+  <rect x="444" y="322" width="4" height="52" rx="2" fill="#475569"/>
+  <text x="810" y="346"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="10" font-weight="600" fill="#94a3b8" letter-spacing="2" text-anchor="middle">LLM PROVIDER</text>
+  <text x="810" y="364"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="12" fill="#6e7681" text-anchor="middle">Provider abstraction layer</text>
+
+  <!-- Arrow 4 -->
+  <line x1="810" y1="374" x2="810" y2="388" stroke="#21262d" stroke-width="1.5"/>
+  <polygon points="810,396 804,386 816,386" fill="#21262d"/>
+
+  <!-- ── SAFETY / FRESHNESS / OBSERVABILITY ── -->
+  <!-- col1: x=444, w=231 → center=559 -->
+  <rect x="444" y="398" width="231" height="56" rx="8" fill="#01150c" stroke="#059669" stroke-width="1.5" stroke-opacity="0.85"/>
+  <text x="559" y="422"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="10" font-weight="600" fill="#34d399" letter-spacing="2" text-anchor="middle">SAFETY</text>
+  <text x="559" y="443"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="12" fill="#6e7681" text-anchor="middle">Guardrails</text>
+
+  <!-- col2: x=691, w=231 → center=806 -->
+  <rect x="691" y="398" width="231" height="56" rx="8" fill="#01150c" stroke="#059669" stroke-width="1.5" stroke-opacity="0.85"/>
+  <text x="806" y="422"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="10" font-weight="600" fill="#34d399" letter-spacing="2" text-anchor="middle">FRESHNESS</text>
+  <text x="806" y="443"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="12" fill="#6e7681" text-anchor="middle">Staleness detection</text>
+
+  <!-- col3: x=938, w=232 → center=1054 -->
+  <rect x="938" y="398" width="232" height="56" rx="8" fill="#01150c" stroke="#059669" stroke-width="1.5" stroke-opacity="0.85"/>
+  <text x="1054" y="422"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="10" font-weight="600" fill="#34d399" letter-spacing="2" text-anchor="middle">OBSERVABILITY</text>
+  <text x="1054" y="443"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="12" fill="#6e7681" text-anchor="middle">Tracing · Metrics</text>
+
+  <!-- Arrow 5 -->
+  <line x1="810" y1="454" x2="810" y2="468" stroke="#21262d" stroke-width="1.5"/>
+  <polygon points="810,476 804,466 816,466" fill="#21262d"/>
+
+  <!-- ── EVALUATION HARNESS ── -->
+  <rect x="444" y="478" width="726" height="78" rx="8" fill="#130303" stroke="#dc2626" stroke-width="1.5" stroke-opacity="0.85"/>
+  <rect x="444" y="478" width="4" height="78" rx="2" fill="#dc2626"/>
+  <text x="462" y="503"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="10" font-weight="600" fill="#f87171" letter-spacing="2">EVALUATION HARNESS</text>
+  <text x="462" y="540"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif"
+    font-size="13" fill="#6e7681">Recall@k  ·  MRR  ·  NDCG  ·  RAGAS  ·  Task Success Rate  ·  Step Accuracy</text>
+
+</svg>

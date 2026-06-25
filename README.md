@@ -1,5 +1,7 @@
 # ClearCode
 
+![ClearCode — System Architecture](assets/cover.svg)
+
 **Reverse-engineering a production-grade autonomous coding agent — one layer at a time.**
 
 I use Claude Code daily. At some point that stopped being enough — I wanted to understand exactly what happens between a natural-language prompt and a committed code change. ClearCode is my attempt to build that understanding by constructing a full coding agent from scratch, with every architectural decision documented publicly.

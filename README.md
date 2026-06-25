@@ -61,7 +61,7 @@ The eval layer is first-class, not an afterthought. Retrieval quality, context q
 
 | Part | Topic | Status |
 |------|-------|--------|
-| 1 | Architecture and design decisions before writing any code | [Published](https://blog.divyampatro.dev) |
+| 1 | Architecture and design decisions before writing any code | [Published](https://blog.divyampatro.dev/clearcode-part-1-reverse-engineering-a-coding-agent-before-writing-a-single-line-of-code) |
 | 2 | Context layer: indexing a codebase | In progress |
 
 ---

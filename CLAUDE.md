@@ -4,71 +4,92 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-ClearCode is a build-in-public project to reverse-engineer a production-grade autonomous coding agent from scratch, using Python, LangChain/LangGraph, and MCP. Each layer is built incrementally and documented publicly at [blog.divyampatro.dev](https://blog.divyampatro.dev).
+ClearCode is a build-in-public project to reverse-engineering a production-grade autonomous coding agent from scratch, using Python, LangChain, and MCP. Each layer is built incrementally and documented publicly at [blog.divyampatro.dev/series/clearcode](https://blog.divyampatro.dev/series/clearcode).
 
-The codebase is **early stage** — the folder structure below is the target architecture; most of it does not exist yet.
+## Current State
 
-## Planned Architecture
+The context layer and initial agent layer are implemented and wired together into a working RAG-powered code assistant REPL.
 
 ```
 clearcode/
-├── context/          # Context layer
-│   ├── indexers/     # Build indexes over the codebase
-│   ├── retrievers/   # Query those indexes
-│   └── memory/       # Short-term and long-term memory
-├── agent/            # Agent reasoning layer (LangGraph)
-├── llm/              # LLM provider abstraction
-├── tools/            # Individual tool functions
-├── mcp/              # MCP server integrations
-├── skills/           # Higher-level composed capabilities
-├── safety/           # Safety layer
-├── freshness/        # Freshness layer
-├── observability/    # Observability layer
-└── eval/             # Evaluation layer
-    ├── datasets/     # Shared golden datasets
-    ├── retrieval/    # Recall@k, MRR, NDCG, Hit Rate
-    ├── context/      # Context precision and recall
-    ├── generation/   # Faithfulness, answer relevancy (RAGAS)
-    └── agent/        # Task success rate, step accuracy
+├── config.py                          # Loads config.yaml via Path(__file__).parent
+├── config.yaml                        # LLM, embeddings, ChromaDB config
+├── main.py                            # REPL entry point — auto-indexes CWD on first run
+├── llm/
+│   └── factory.py                     # Provider-dispatched LLM and embedder factories
+├── context/
+│   ├── indexers/
+│   │   ├── code_parser.py             # AST chunking (tree-sitter) + sliding window fallback
+│   │   └── semantic_chroma.py         # Embeds chunks and upserts into ChromaDB
+│   └── retrievers/
+│       └── semantic_chroma.py         # Embeds query, returns top-k chunks from ChromaDB
+├── agent/
+│   ├── factory.py                     # Builds tool-calling LangChain agent
+│   ├── orchestrator.py                # handle_query() entry point
+│   └── tools.py                       # search_codebase LangChain tool
+└── observability/
+    └── logger.py                      # Root logger at WARNING, clearcode loggers at DEBUG
 ```
 
-## Stack
-
-- **Python** — primary language
-- **LangChain / LangGraph** — agent orchestration
-- **MCP (Model Context Protocol)** — tool/server integrations
-
-Stack evolves as each layer is built; update this file when packages are pinned.
+Layers not yet built: `memory/`, `mcp/`, `skills/`, `safety/`, `freshness/`, `eval/`.
 
 ## Development Setup
 
-Commands will be added here as each layer is implemented. Once a `pyproject.toml` or `requirements.txt` exists:
-
 ```bash
-# Install dependencies (expected)
-pip install -e ".[dev]"
+# Install dependencies
+poetry install
 
-# Run tests (expected)
-pytest
+# Run the REPL (auto-indexes current directory on first run)
+poetry run clearcode
 
-# Run a single test
-pytest path/to/test_file.py::test_name -v
-
-# Lint (expected)
-ruff check .
-ruff format .
+# Activate the venv in your shell
+source $(poetry env info --path)/bin/activate
 ```
 
-Update this section when the actual tooling is wired up.
+Python 3.12 is required (`tree-sitter-languages` has no wheels for 3.14+).
+
+## Key Config
+
+`clearcode/config.yaml` controls the active providers:
+
+```yaml
+llm:
+  provider: openai   # openai | anthropic
+  model: gpt-4o
+
+embeddings:
+  provider: openai   # openai | huggingface
+  model: text-embedding-3-small
+
+chromadb:
+  persist_dir: .chromadb/
+  collection_name: codebase
+```
+
+API keys go in `.env` at the repo root (gitignored). `load_dotenv()` in `main.py` finds it automatically via the editable install path — no need to export to shell when using `poetry run`.
+
+## REPL Commands
+
+| Command | Description |
+|---------|-------------|
+| `/ask <question>` | Ask a question about the codebase |
+| `/show_semantic_index` | Dump all indexed chunks with embeddings |
+| `/exit` | Quit |
+
+## Architecture Notes
+
+- **Chunking**: `code_parser.py` uses tree-sitter for AST-aware chunking across 15 languages. Falls back to a sliding window (50 lines, 10-line overlap) for text/config files and files with no extractable AST blocks.
+- **Indexing**: Chunks are upserted with stable IDs (`source::name::start_line`) so re-indexing is safe and idempotent.
+- **Retrieval**: Query is embedded with the same model used at index time — changing `embeddings.model` in config requires a full re-index (delete `.chromadb/`).
+- **Agent**: `factory.py` builds a `create_tool_calling_agent` + `AgentExecutor` with a single `search_codebase` tool. The system prompt instructs the LLM to always search before answering.
 
 ## Build Order
 
-The project is built layer by layer in series order:
-1. Architecture (done — this repo)
-2. Context layer: indexers → retrievers → memory
-3. Agent reasoning layer
-4. LLM abstraction
-5. Tools, MCP integrations, Skills
+1. Architecture — done
+2. Context layer: indexers + retrievers — **done**
+3. Agent reasoning layer — **done (initial)**
+4. Memory layer
+5. MCP integrations, Skills
 6. Safety, Freshness, Observability
 7. Eval layer
 

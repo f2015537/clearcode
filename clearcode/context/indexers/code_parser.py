@@ -91,12 +91,13 @@ def _parse_with_treesitter(source: str, filepath: str, language_name: str) -> li
   """Parse source with the appropriate tree-sitter grammar and extract named blocks."""
   logger.info(f"Parsing {language_name} file: {filepath}")
   parser = get_parser(language_name)
-  tree = parser.parse(source.encode())
+  source_bytes = source.encode()
+  tree = parser.parse(source_bytes)
   lines = source.splitlines()
 
 
   chunks = []
-  _walk(tree.root_node, source, filepath, chunks, depth=0)
+  _walk(tree.root_node, source_bytes, filepath, chunks, depth=0)
 
 
   # If the AST yielded nothing (e.g. a file with only imports), fall back to line chunks
@@ -109,14 +110,14 @@ def _parse_with_treesitter(source: str, filepath: str, language_name: str) -> li
   return chunks
 
 
-def _walk(node, source: str, filepath: str, chunks: list, depth: int):
+def _walk(node, source_bytes: bytes, filepath: str, chunks: list, depth: int):
   """
   Recursively walk the AST. When a named block node is found, record it and stop
   descending — this keeps chunks at the top level and avoids duplicating nested functions.
   """
   if node.type in BLOCK_NODE_TYPES:
-      name = _extract_name(node, source)
-      content = source[node.start_byte:node.end_byte]
+      name = _extract_name(node, source_bytes)
+      content = source_bytes[node.start_byte:node.end_byte].decode(errors="ignore")
       chunk_type = "class" if "class" in node.type else "function"
       chunks.append(ParsedChunk(
           name=name,
@@ -131,14 +132,14 @@ def _walk(node, source: str, filepath: str, chunks: list, depth: int):
 
 
   for child in node.children:
-      _walk(child, source, filepath, chunks, depth + 1)
+      _walk(child, source_bytes, filepath, chunks, depth + 1)
 
 
-def _extract_name(node, source: str) -> str:
+def _extract_name(node, source_bytes: bytes) -> str:
   """Find the identifier child of a block node and return its text as the chunk name."""
   for child in node.children:
       if child.type in ("identifier", "name", "property_identifier"):
-          return source[child.start_byte:child.end_byte]
+          return source_bytes[child.start_byte:child.end_byte].decode(errors="ignore")
   return node.type  # fallback to node type if no name found
 
 

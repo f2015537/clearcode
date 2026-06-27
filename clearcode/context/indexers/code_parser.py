@@ -171,7 +171,7 @@ def _sliding_window(lines: list[str], filepath: str) -> list[ParsedChunk]:
 
 def get_source_files(repo_path: str, skip_dirs: list[str] = None) -> list[str]:
   """Recursively find all indexable source files under repo_path, skipping build/env dirs."""
-  skip = set(skip_dirs or [".venv", "venv", "__pycache__", ".git", "node_modules", "dist", "build"])
+  skip = set(skip_dirs or [".venv", "venv", "__pycache__", ".git", "node_modules", "dist", "build", ".vscode", ".idea", ".chromadb"])
   files = [
       str(path) for path in Path(repo_path).rglob("*")
       if path.suffix.lower() in ALL_EXTENSIONS

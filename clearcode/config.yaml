@@ -2,6 +2,12 @@ embeddings:
   provider: openai
   model: text-embedding-3-small
 
+vector_store:
+  provider: qdrant
+
+qdrant:
+  collection_name: codebase
+
 chromadb:
   persist_dir: .chromadb/
   collection_name: codebase

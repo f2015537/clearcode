@@ -83,6 +83,8 @@ def show_index(vector_store: QdrantVectorStore) -> None:
    console = Console()
    client = vector_store.client
    collection_name = config["qdrant"]["collection_name"]
+   # with_vectors=True fetches the full embedding payload (~6MB for 1000 points)
+   # and causes ReadTimeout on the Qdrant cloud free tier — keep it False.
    results = client.scroll(collection_name=collection_name, with_payload=True, with_vectors=False, limit=1000)
    points = results[0]
    console.print(f"\n[bold]Semantic Index — {len(points)} chunks[/bold]\n")
@@ -95,4 +97,5 @@ def show_index(vector_store: QdrantVectorStore) -> None:
        console.print(f"  File     : {meta['source']}")
        console.print(f"  Name     : {meta['name']} ({meta['type']})")
        console.print(f"  Lines    : {meta['start_line']} - {meta['end_line']}")
+       # console.print(f"  Embedding: [{', '.join(f'{v:.4f}' for v in point.vector[:5])}...] ({len(point.vector)} dims)")
        console.print(f"  Code     :\n[dim]{payload.get('page_content', '')[:300]}[/dim]\n")

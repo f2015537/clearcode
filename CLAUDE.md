@@ -8,21 +8,25 @@ ClearCode is a build-in-public project to reverse-engineering a production-grade
 
 ## Current State
 
-The context layer and initial agent layer are implemented and wired together into a working RAG-powered code assistant REPL.
+The context layer and initial agent layer are implemented and wired together into a working RAG-powered code assistant REPL. Both ChromaDB and Qdrant are supported as vector store backends, switchable via config.
 
 ```
 clearcode/
 ├── config.py                          # Loads config.yaml via Path(__file__).parent
-├── config.yaml                        # LLM, embeddings, ChromaDB config
+├── config.yaml                        # LLM, embeddings, vector store config
 ├── main.py                            # REPL entry point — auto-indexes CWD on first run
 ├── llm/
 │   └── factory.py                     # Provider-dispatched LLM and embedder factories
 ├── context/
 │   ├── indexers/
+│   │   ├── factory.py                 # get_indexer() / get_index_inspector() — dispatches by provider
 │   │   ├── code_parser.py             # AST chunking (tree-sitter) + sliding window fallback
-│   │   └── semantic_chroma.py         # Embeds chunks and upserts into ChromaDB
+│   │   ├── semantic_chroma.py         # Embeds chunks and upserts into ChromaDB
+│   │   └── semantic_qdrant.py         # Embeds chunks and upserts into Qdrant
 │   └── retrievers/
-│       └── semantic_chroma.py         # Embeds query, returns top-k chunks from ChromaDB
+│       ├── factory.py                 # get_retriever() — dispatches by provider
+│       ├── semantic_chroma.py         # Embeds query, returns top-k chunks from ChromaDB
+│       └── semantic_qdrant.py         # Embeds query, returns top-k chunks from Qdrant
 ├── agent/
 │   ├── factory.py                     # Builds tool-calling LangChain agent
 │   ├── orchestrator.py                # handle_query() entry point
@@ -61,27 +65,47 @@ embeddings:
   provider: openai   # openai | huggingface
   model: text-embedding-3-small
 
+vector_store:
+  provider: chromadb  # chromadb | qdrant
+
 chromadb:
   persist_dir: .chromadb/
   collection_name: codebase
+
+qdrant:
+  collection_name: codebase
 ```
 
-API keys go in `.env` at the repo root (gitignored). `load_dotenv()` in `main.py` finds it automatically via the editable install path — no need to export to shell when using `poetry run`.
+API keys go in `.env` at the repo root (gitignored). `load_dotenv()` in `main.py` uses an explicit path relative to `__file__` so it works correctly under both `poetry run` and an activated venv. Qdrant requires `QDRANT_URL` and `QDRANT_API_KEY` in `.env`.
+
+Switching `vector_store.provider` or `embeddings.model` requires a full re-index:
+- ChromaDB: delete `.chromadb/`
+- Qdrant: delete the collection via the Qdrant client or dashboard
 
 ## REPL Commands
 
 | Command | Description |
 |---------|-------------|
 | `/ask <question>` | Ask a question about the codebase |
-| `/show_semantic_index` | Dump all indexed chunks with embeddings |
+| `/show_semantic_index` | Dump all indexed chunks |
 | `/exit` | Quit |
 
 ## Architecture Notes
 
-- **Chunking**: `code_parser.py` uses tree-sitter for AST-aware chunking across 15 languages. Falls back to a sliding window (50 lines, 10-line overlap) for text/config files and files with no extractable AST blocks.
-- **Indexing**: Chunks are upserted with stable IDs (`source::name::start_line`) so re-indexing is safe and idempotent.
-- **Retrieval**: Query is embedded with the same model used at index time — changing `embeddings.model` in config requires a full re-index (delete `.chromadb/`).
-- **Agent**: `factory.py` builds a `create_tool_calling_agent` + `AgentExecutor` with a single `search_codebase` tool. The system prompt instructs the LLM to always search before answering.
+- **Chunking**: `code_parser.py` uses tree-sitter for AST-aware chunking across 15 languages. Falls back to a sliding window (50 lines, 10-line overlap) for text/config files and files with no extractable AST blocks. tree-sitter returns byte offsets — all slicing is done on `source_bytes` (not the decoded `str`) to avoid truncation with multi-byte characters.
+- **Indexing**: ChromaDB uses stable chunk IDs (`source::name::start_line`) for idempotent upserts. Qdrant uses `QdrantVectorStore.from_documents()` and checks `points_count` to skip re-indexing.
+- **Retrieval**: Both backends embed the query with the same model used at index time. The active backend is selected at call time via `retrievers/factory.py`.
+- **Agent**: `factory.py` builds a `create_agent` + tool-calling chain with a single `search_codebase` tool. The system prompt instructs the LLM to always search before answering.
+- **Vector store abstraction**: `indexers/factory.py` and `retrievers/factory.py` dispatch to the right backend based on `config["vector_store"]["provider"]`. Adding a new backend only requires a new `semantic_<backend>.py` pair and a branch in each factory.
+
+## Known Flaws (not yet fixed)
+
+- Agent and LLM client are rebuilt on every `/ask` — should be initialized once at startup.
+- Retriever opens a new DB client on every query — should reuse the connection from indexing.
+- Both factory files silently fall through to ChromaDB for unknown provider names — should raise `ValueError`.
+- `_sliding_window` raises `ValueError` on empty files instead of returning `[]`, causing empty `__init__.py` files to log as indexing errors.
+- `show_index` in `semantic_chroma.py` fetches all embedding vectors into memory — wasteful for large collections.
+- Qdrant indexer batches all docs before upserting — no partial progress on failure.
 
 ## Build Order
 

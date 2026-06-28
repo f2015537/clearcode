@@ -149,7 +149,7 @@ def _sliding_window(lines: list[str], filepath: str) -> list[ParsedChunk]:
   Used for text files and as a fallback when AST parsing finds nothing.
   """
   if not lines:
-      raise ValueError(f"Empty file: {filepath}")
+      return []
 
 
   chunks = []

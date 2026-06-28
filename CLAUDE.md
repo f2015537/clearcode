@@ -109,7 +109,7 @@ API keys go in `.env` at the repo root (gitignored). `load_dotenv()` in `main.py
 - Agent and LLM client are rebuilt on every `/ask` — should be initialized once at startup.
 - Retriever opens a new DB client on every query — should reuse the connection from indexing.
 - Both factory files silently fall through to ChromaDB for unknown provider names — should raise `ValueError`.
-- `_sliding_window` raises `ValueError` on empty files instead of returning `[]`, causing empty `__init__.py` files to log as indexing errors.
+- ~~`_sliding_window` raises `ValueError` on empty files~~ — fixed, now returns `[]`.
 - `show_index` in `semantic_chroma.py` fetches all embedding vectors into memory — wasteful for large collections.
 - Qdrant indexers batch all docs before upserting — no partial progress on failure.
 

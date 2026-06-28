@@ -1,19 +1,20 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+
+# Must run before any clearcode.* import — those modules call get_llm/get_embedder
+# lazily, but any future refactor moving those calls to module level would silently
+# break credential loading if .env isn't loaded first.
+load_dotenv(Path(__file__).parent.parent / ".env")
+
 from rich.console import Console
 from rich.prompt import Prompt
-
 
 from clearcode.config import config
 from clearcode.context.indexers.factory import get_indexer, get_index_inspector
 from clearcode.llm.factory import get_llm, get_embedder
 from clearcode.agent.orchestrator import handle_query
 from clearcode.observability.logger import get_logger
-
-
-# Load .env before anything else
-load_dotenv(Path(__file__).parent.parent / ".env")
 
 
 console = Console()

@@ -157,7 +157,6 @@ Full series index: [blog.divyampatro.dev/series/clearcode](https://blog.divyampa
 |------|-------|--------|
 | 1 | [Architecture and design decisions before writing any code](https://blog.divyampatro.dev/clearcode-part-1-reverse-engineering-a-coding-agent-before-writing-a-single-line-of-code) | Published |
 | 2 | Context layer: AST-aware indexing, vector stores, and hybrid retrieval | Coming soon |
-| 3 | Agent reasoning: tool-calling, orchestration, and the REPL | Upcoming |
 
 ---
 

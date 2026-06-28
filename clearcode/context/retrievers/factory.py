@@ -8,7 +8,7 @@ logger = get_logger(__name__)
 def get_retriever():
    """Return the right retrieve function based on rag mode and vector_store in config."""
    mode = config["rag"]["mode"]
-   vector_store = config["vector_store"]["vector_store"]
+   vector_store = config["vector_store"]["provider"]
 
 
    if mode == "hybrid" and vector_store == "qdrant":

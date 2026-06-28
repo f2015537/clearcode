@@ -191,12 +191,21 @@ poetry install
 cp .env.example .env
 # Edit .env and add your API keys
 
-# 3. Run from inside any repo you want to query
+# 3. Activate the virtualenv
+source $(poetry env info --path)/bin/activate
+
+# 4. Navigate to any repo you want to query and run
 cd /path/to/your/project
-poetry run clearcode
+clearcode
 ```
 
-To use ChromaDB locally instead of Qdrant (no cloud account needed), set the following in `clearcode/config.yaml`:
+**ChromaDB vs Qdrant for multi-project use**
+
+ChromaDB stores its index in a `.chromadb/` folder inside whichever directory you run `clearcode` from — each project automatically gets its own isolated index. This is the simplest setup for querying multiple codebases.
+
+Qdrant uses a single named collection (`codebase` by default). Running `clearcode` in a new project will reuse the existing collection rather than re-indexing, so you would need to either delete the collection between projects or configure a different `qdrant.collection_name` per project in `config.yaml`.
+
+For multi-project use, ChromaDB is recommended. Set it in `clearcode/config.yaml`:
 
 ```yaml
 rag:

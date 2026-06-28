@@ -28,19 +28,64 @@ cd /path/to/your/project
 poetry run clearcode
 ```
 
+The active retrieval mode is controlled by a single config field — `vector_store.retrieval_mode: dense | sparse | hybrid` — and the difference is observable. Here are real examples run against this codebase.
+
+---
+
+**Dense retrieval** — semantic similarity. Best for conceptual and design questions where exact wording doesn't match the source.
+
 ```
-ClearCode — RAG-powered code assistant
+> /ask what is the philosophy behind not indexing nested functions?
 
-> /ask how does the chunking system work?
+The design philosophy is outlined across code_parser.py and CLAUDE.md. The _walk
+function (lines 113–135) stops recursing the moment it hits a named block node,
+ensuring that each top-level function or class is indexed as a single coherent
+unit. Indexing nested functions separately would duplicate context — the outer
+function already contains the inner one — and produce misleading chunk boundaries.
 
-The chunking system in code_parser.py (lines 71–87) uses tree-sitter to walk
-the AST and extract named blocks — functions, classes, and methods — across 15
-languages. It stops at the top-level block and does not index nested functions
-separately, keeping chunks semantically coherent.
-
-For files with no meaningful AST (config, markdown, text), it falls back to a
-sliding window of 50 lines with 10-line overlap (lines 146–170).
+This also simplifies the stable chunk ID scheme (source::name::start_line) used
+for idempotent upserts in ChromaDB, where collisions on nested definitions with
+the same name would silently overwrite chunks.
 ```
+
+---
+
+**Sparse retrieval (BM25)** — exact keyword matching. Best for precise identifier and constant lookups.
+
+```
+> /ask what value does CHUNK_OVERLAP have and where is it defined?
+
+CHUNK_OVERLAP is used in the _sliding_window function in
+clearcode/context/indexers/code_parser.py at line 154, where it controls the
+step size between successive window positions as CHUNK_SIZE - CHUNK_OVERLAP.
+```
+
+*Dense on the same question* retrieved the value (10) from CLAUDE.md where "10-line overlap" appears as prose — but missed the code location. *Sparse* found the exact usage site. Neither retrieved the constant definition itself (lines 44–47 in code_parser.py), because module-level constants between functions don't fall inside any indexed AST chunk — an honest limitation of the current chunking strategy.
+
+---
+
+**Hybrid retrieval** — dense + BM25 fused. Best when the question mixes exact identifiers with conceptual reasoning.
+
+```
+> /ask how does _extract_name fall back when no identifier node is found, and
+  why does that cause a problem with BLOCK_NODE_TYPES like arrow_function?
+
+_extract_name (code_parser.py, lines 138–143) iterates over the children of a
+block node looking for a child with type "identifier", "name", or
+"property_identifier". If none is found, it returns node.type as a fallback —
+so for an arrow_function node with no direct identifier child, the chunk name
+becomes "arrow_function".
+
+This is a problem because the identifier for an arrow function (const x = () => {})
+lives on the parent variable_declarator, not on the arrow_function node itself.
+The fallback produces a generic, non-unique name that collides across all
+anonymous arrow functions in the same file, and makes retrieval results
+meaningless for JS codebases heavy in functional patterns.
+```
+
+This question contains exact identifiers (`_extract_name`, `BLOCK_NODE_TYPES`, `arrow_function`) that BM25 pins down, and conceptual reasoning about parent/child AST relationships that dense embeddings surface. Neither mode alone retrieves the full picture.
+
+---
 
 | Command | Description |
 |---------|-------------|

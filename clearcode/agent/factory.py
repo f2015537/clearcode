@@ -1,10 +1,10 @@
 from langchain.agents import create_agent
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 
 from clearcode.llm.factory import get_llm
 from clearcode.agent.tools import search_codebase
 from clearcode.observability.logger import get_logger
+from clearcode.memory.short_term import get_checkpointer, get_summarization_middleware
 
 
 logger = get_logger(__name__)
@@ -17,12 +17,16 @@ If you cannot find the answer in the codebase, say so explicitly."""
 
 
 def build_agent():
-  """Create and return a LangChain agent."""
+  """Create and return a LangChain agent with persistent memory."""
   llm = get_llm()
   tools = [search_codebase]
   logger.info("Creating agent")
+  checkpointer = get_checkpointer()
+  middleware = get_summarization_middleware()
   return create_agent(
       llm,
       tools=tools,
       system_prompt=SYSTEM_PROMPT,
+      checkpointer=checkpointer,
+      middleware=[middleware],
   )

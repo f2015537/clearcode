@@ -3,10 +3,10 @@ embeddings:
   model: text-embedding-3-small
 
 rag:
-  mode: hybrid # semantic | hybrid
+  mode: semantic # semantic | hybrid
 
 vector_store:
-  provider: qdrant
+  provider: chromadb
   retrieval_mode: hybrid # dense | sparse | hybrid
 
 qdrant:
@@ -23,3 +23,8 @@ elasticsearch:
 llm:
   provider: openai # openai | anthropic
   model: gpt-4o
+
+memory:
+  db_path: .memory/memory.db
+  summarize_at_tokens: 4000
+  keep_last_messages: 20

@@ -33,11 +33,14 @@ clearcode/
 │   ├── factory.py                     # Builds tool-calling LangChain agent
 │   ├── orchestrator.py                # handle_query() entry point
 │   └── tools.py                       # search_codebase LangChain tool
+├── memory/
+│   ├── session.py                     # Session ID management (UUID, persisted to .memory/current_session)
+│   └── short_term.py                  # SqliteSaver checkpointer + summarization middleware
 └── observability/
     └── logger.py                      # Root logger at WARNING, clearcode loggers at DEBUG
 ```
 
-Layers not yet built: `memory/`, `mcp/`, `skills/`, `safety/`, `freshness/`, `eval/`.
+Layers not yet built: `mcp/`, `skills/`, `safety/`, `freshness/`, `eval/`.
 
 ## Development Setup
 
@@ -112,13 +115,18 @@ API keys go in `.env` at the repo root (gitignored). `load_dotenv()` in `main.py
 - ~~`_sliding_window` raises `ValueError` on empty files~~ — fixed, now returns `[]`.
 - `show_index` in `semantic_chroma.py` fetches all embedding vectors into memory — wasteful for large collections.
 - Qdrant indexers batch all docs before upserting — no partial progress on failure.
+- `get_checkpointer()` opens a new SQLite connection on every call — connections accumulate and are never closed.
+- `get_session_history()` in `short_term.py` is defined but never called — dead code.
+- `memory.db_path` in `config.yaml` is CWD-relative — running `clearcode` from different directories creates separate `.memory/` folders with no session continuity across projects.
+- `llm` and `embedder` returned from `initialize()` in `main.py` are never used downstream — the agent constructs its own copies per query.
+- `show_index` in Qdrant backends hardcodes `limit=1000` — silently truncates for large collections.
 
 ## Build Order
 
 1. Architecture — done
 2. Context layer: indexers + retrievers — **done**
 3. Agent reasoning layer — **done (initial)**
-4. Memory layer
+4. Memory layer — **in progress**
 5. MCP integrations, Skills
 6. Safety, Freshness, Observability
 7. Eval layer

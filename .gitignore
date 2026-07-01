@@ -5,6 +5,9 @@
 # Vector store data
 .chromadb/
 
+# Memory layer runtime state
+.memory/
+
 
 # Python
 __pycache__/

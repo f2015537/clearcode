@@ -156,7 +156,7 @@ Full series index: [blog.divyampatro.dev/series/clearcode](https://blog.divyampa
 | Part | Topic | Status |
 |------|-------|--------|
 | 1 | [Architecture and design decisions before writing any code](https://blog.divyampatro.dev/clearcode-part-1-reverse-engineering-a-coding-agent-before-writing-a-single-line-of-code) | Published |
-| 2 | Context layer: AST-aware indexing, vector stores, and hybrid retrieval | Coming soon |
+| 2 | [Context layer: AST-aware indexing, vector stores, and hybrid retrieval](https://blog.divyampatro.dev/clearcode-part-2-ast-aware-indexing-vector-stores-and-hybrid-retrieval) | Published |
 
 ---
 

@@ -30,17 +30,24 @@ clearcode/
 │       ├── semantic_qdrant.py         # Dense retrieval from Qdrant
 │       └── hybrid_qdrant.py          # Dense + sparse hybrid retrieval from Qdrant
 ├── agent/
-│   ├── factory.py                     # Builds tool-calling LangChain agent
-│   ├── orchestrator.py                # handle_query() entry point
-│   └── tools.py                       # search_codebase LangChain tool
+│   ├── factory.py                     # Builds async tool-calling LangChain agent with MCP + local tools
+│   └── orchestrator.py                # handle_query() entry point (async)
+├── tools/
+│   ├── retrieval_tools.py             # search_codebase LangChain tool
+│   ├── filesystem_tools.py            # read/write/append/delete/list/exists tools
+│   └── terminal_tools.py             # run_command, run_in_directory tools
+├── mcp/
+│   ├── clearcode_mcp_client.py        # Connects to MCP servers, returns tools via langchain-mcp-adapters
+│   ├── clearcode_mcp_config.py        # Loads clearcode_mcp_servers.json, resolves ${ENV_VAR} placeholders
+│   └── clearcode_mcp_servers.json     # MCP server definitions (GitHub configured by default)
 ├── memory/
 │   ├── session.py                     # Session ID management (UUID, persisted to .memory/current_session)
-│   └── short_term.py                  # SqliteSaver checkpointer + summarization middleware
+│   └── short_term.py                  # AsyncSqliteSaver path helper + SummarizationMiddleware
 └── observability/
     └── logger.py                      # Root logger at WARNING, clearcode loggers at DEBUG
 ```
 
-Layers not yet built: `mcp/`, `skills/`, `safety/`, `freshness/`, `eval/`.
+Layers not yet built: `skills/`, `safety/`, `freshness/`, `eval/`.
 
 ## Development Setup
 
@@ -109,17 +116,20 @@ API keys go in `.env` at the repo root (gitignored). `load_dotenv()` in `main.py
 
 ## Known Flaws (not yet fixed)
 
-- Agent and LLM client are rebuilt on every `/ask` — should be initialized once at startup.
+- ~~Agent and LLM client are rebuilt on every `/ask`~~ — fixed, agent is now built once at startup via `AsyncSqliteSaver` context manager.
 - Retriever opens a new DB client on every query — should reuse the connection from indexing.
 - Both factory files silently fall through to ChromaDB for unknown provider names — should raise `ValueError`.
 - ~~`_sliding_window` raises `ValueError` on empty files~~ — fixed, now returns `[]`.
 - `show_index` in `semantic_chroma.py` fetches all embedding vectors into memory — wasteful for large collections.
 - Qdrant indexers batch all docs before upserting — no partial progress on failure.
-- `get_checkpointer()` opens a new SQLite connection on every call — connections accumulate and are never closed.
-- `get_session_history()` in `short_term.py` is defined but never called — dead code.
+- ~~`get_checkpointer()` opens a new SQLite connection on every call~~ — fixed, `AsyncSqliteSaver` is now managed as a context manager in `_run_async` and shared across the session.
+- ~~`get_session_history()` in `short_term.py` is defined but never called~~ — removed.
 - `memory.db_path` in `config.yaml` is CWD-relative — running `clearcode` from different directories creates separate `.memory/` folders with no session continuity across projects.
 - `llm` and `embedder` returned from `initialize()` in `main.py` are never used downstream — the agent constructs its own copies per query.
 - `show_index` in Qdrant backends hardcodes `limit=1000` — silently truncates for large collections.
+- `switch_session` in `main.py` accepts any arbitrary string with no validation that the thread ID exists in the SQLite DB — passing a non-existent ID silently starts a blank conversation.
+- `_build_system_prompt` in `agent/factory.py` formats MCP tool descriptions as `t.description` without guarding against `None` — servers that omit descriptions will render as `tool_name: None` or raise `AttributeError`.
+- `rich.Prompt.ask()` is synchronous blocking I/O called inside `async def _run_async` — blocks the event loop while waiting for user input.
 
 ## Build Order
 
@@ -127,8 +137,9 @@ API keys go in `.env` at the repo root (gitignored). `load_dotenv()` in `main.py
 2. Context layer: indexers + retrievers — **done**
 3. Agent reasoning layer — **done (initial)**
 4. Memory layer — **in progress**
-5. MCP integrations, Skills
-6. Safety, Freshness, Observability
-7. Eval layer
+5. MCP integrations — **in progress**
+6. Skills
+7. Safety, Freshness, Observability
+8. Eval layer
 
 When adding code, match the layer currently being built in the blog series. Don't implement future layers ahead of the companion post.

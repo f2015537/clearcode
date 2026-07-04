@@ -8,7 +8,7 @@ ClearCode is a build-in-public project to reverse-engineering a production-grade
 
 ## Current State
 
-The context layer and initial agent layer are implemented and wired together into a working RAG-powered code assistant REPL. Three vector store backends are supported (ChromaDB, Qdrant semantic, Qdrant hybrid), all switchable via config.
+The context, agent, memory, MCP, and skills layers are implemented and wired together into a working RAG-powered code assistant REPL. Three vector store backends are supported (ChromaDB, Qdrant semantic, Qdrant hybrid), all switchable via config. The agent is fully async, connects to MCP servers at startup, and supports a progressive-disclosure skills system.
 
 ```
 clearcode/
@@ -43,11 +43,14 @@ clearcode/
 ├── memory/
 │   ├── session.py                     # Session ID management (UUID, persisted to .memory/current_session)
 │   └── short_term.py                  # AsyncSqliteSaver path helper + SummarizationMiddleware
+├── skills/
+│   ├── registry.py                    # SkillRegistry — scans .clearcode/skills/, parses SKILL.md frontmatter
+│   └── skill_tools.py                 # load_skill @tool + singleton get_registry() + build_skills_prompt()
 └── observability/
     └── logger.py                      # Root logger at WARNING, clearcode loggers at DEBUG
 ```
 
-Layers not yet built: `skills/`, `safety/`, `freshness/`, `eval/`.
+Layers not yet built: `safety/`, `freshness/`, `eval/`.
 
 ## Development Setup
 
@@ -78,32 +81,45 @@ embeddings:
   model: text-embedding-3-small
 
 rag:
-  mode: hybrid       # semantic | hybrid
+  mode: semantic     # semantic | hybrid
 
 vector_store:
-  provider: qdrant           # chromadb | qdrant
+  provider: chromadb         # chromadb | qdrant
   retrieval_mode: hybrid     # dense | sparse | hybrid (Qdrant only)
 
 chromadb:
-  persist_dir: .chromadb/
+  persist_dir: .clearcode/chromadb/
   collection_name: codebase
 
 qdrant:
   collection_name: codebase
+
+memory:
+  db_path: .clearcode/memory/memory.db
+  summarize_at_tokens: 4000
+  keep_last_messages: 20
+
+skills:
+  skills_dir: .clearcode/skills
 ```
 
-API keys go in `.env` at the repo root (gitignored). `load_dotenv()` in `main.py` is called before all `clearcode.*` imports using an explicit path relative to `__file__`. Qdrant requires `QDRANT_URL` and `QDRANT_API_KEY` in `.env`.
+All runtime state (index, memory DB, skills) is stored under `.clearcode/` in the CWD. API keys go in `.env` at the repo root (gitignored). `load_dotenv()` in `main.py` is called before all `clearcode.*` imports using an explicit path relative to `__file__`. Qdrant requires `QDRANT_URL` and `QDRANT_API_KEY` in `.env`.
 
 **Re-indexing**: switching `rag.mode`, `vector_store.provider`, or `embeddings.model` requires a full re-index:
-- ChromaDB: delete `.chromadb/`
+- ChromaDB: delete `.clearcode/chromadb/`
 - Qdrant: delete the collection via the Qdrant dashboard or client
+
+**Skills**: place skill packages under `.clearcode/skills/<skill_name>/SKILL.md` in the project being analysed. Each `SKILL.md` requires YAML frontmatter (`name`, `description`, `when_to_use`) followed by the instruction body. Support files (scripts, templates, resources) can be nested inside the skill folder and are listed to the agent on demand.
 
 ## REPL Commands
 
 | Command | Description |
 |---------|-------------|
 | `/ask <question>` | Ask a question about the codebase |
-| `/show_semantic_index` | Dump all indexed chunks |
+| `/show_index` | Dump all indexed chunks |
+| `/new_session` | Start a fresh conversation |
+| `/switch <session_id>` | Resume a past session |
+| `/session` | Show current session ID |
 | `/exit` | Quit |
 
 ## Architecture Notes
@@ -112,7 +128,9 @@ API keys go in `.env` at the repo root (gitignored). `load_dotenv()` in `main.py
 - **Indexing**: ChromaDB uses stable chunk IDs (`source::name::start_line`) for idempotent upserts. Qdrant backends use `from_documents()` and check `points_count` to skip re-indexing on startup.
 - **Hybrid RAG**: `hybrid_qdrant.py` stores both dense (OpenAI `text-embedding-3-small`) and sparse (BM25 via `fastembed`) vectors per chunk. `retrieval_mode` in config controls whether queries use dense, sparse, or hybrid fusion at retrieval time.
 - **Factory dispatch**: `indexers/factory.py` and `retrievers/factory.py` select the backend based on `config["rag"]["mode"]` and `config["vector_store"]["provider"]`. Adding a new backend requires a new `*_<backend>.py` pair and a branch in each factory.
-- **Agent**: `factory.py` builds a `create_agent` + tool-calling chain with a single `search_codebase` tool. The system prompt instructs the LLM to always search before answering.
+- **Agent**: `factory.py` builds an async `create_agent` with local tools (search, filesystem, terminal), MCP tools loaded at startup, and a `load_skill` tool for progressive skill disclosure. The system prompt is built dynamically — it includes MCP tool names/descriptions and a skills index (name + when_to_use) so the LLM knows what's available without paying the token cost of full skill bodies.
+- **Skills**: `SkillRegistry` scans `.clearcode/skills/` at startup. Each skill is a folder with a `SKILL.md` (YAML frontmatter + instruction body). The agent sees a compact metadata summary in the system prompt (Tier 1), loads the full body via `load_skill` on demand (Tier 2), and reads individual support files via `read_file` if needed (Tier 3).
+- **MCP**: `clearcode_mcp_servers.json` defines MCP servers. `clearcode_mcp_config.py` resolves `${ENV_VAR}` placeholders. `clearcode_mcp_client.py` connects via `langchain-mcp-adapters` at agent startup and returns tools. GitHub MCP server is configured by default — works unauthenticated for public repos; set `GITHUB_TOKEN` in `.env` for private repos and write access.
 
 ## Known Flaws (not yet fixed)
 
@@ -128,7 +146,7 @@ API keys go in `.env` at the repo root (gitignored). `load_dotenv()` in `main.py
 - `llm` and `embedder` returned from `initialize()` in `main.py` are never used downstream — the agent constructs its own copies per query.
 - `show_index` in Qdrant backends hardcodes `limit=1000` — silently truncates for large collections.
 - `switch_session` in `main.py` accepts any arbitrary string with no validation that the thread ID exists in the SQLite DB — passing a non-existent ID silently starts a blank conversation.
-- `_build_system_prompt` in `agent/factory.py` formats MCP tool descriptions as `t.description` without guarding against `None` — servers that omit descriptions will render as `tool_name: None` or raise `AttributeError`.
+- ~~`_build_system_prompt` in `agent/factory.py` formats MCP tool descriptions without guarding against `None`~~ — fixed, falls back to `"No description"`.
 - `rich.Prompt.ask()` is synchronous blocking I/O called inside `async def _run_async` — blocks the event loop while waiting for user input.
 
 ## Build Order
@@ -137,8 +155,8 @@ API keys go in `.env` at the repo root (gitignored). `load_dotenv()` in `main.py
 2. Context layer: indexers + retrievers — **done**
 3. Agent reasoning layer — **done (initial)**
 4. Memory layer — **in progress**
-5. MCP integrations — **in progress**
-6. Skills
+5. MCP integrations — **done (initial)**
+6. Skills — **done (initial)**
 7. Safety, Freshness, Observability
 8. Eval layer
 

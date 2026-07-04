@@ -16,6 +16,7 @@ from clearcode.tools.filesystem_tools import (
     file_exists,
 )
 from clearcode.mcp.clearcode_mcp_client import get_clearcode_mcp_tools
+from clearcode.skills.skill_tools import load_skill, build_skills_prompt
 
 logger = get_logger(__name__)
 
@@ -41,10 +42,19 @@ Guidelines:
 
 
 def _build_system_prompt(mcp_tools: list) -> str:
-    if not mcp_tools:
-        return _BASE_SYSTEM_PROMPT
-    tool_lines = "\n".join(f"- {t.name}: {t.description}" for t in mcp_tools)
-    return f"{_BASE_SYSTEM_PROMPT}\n\nMCP tools:\n{tool_lines}"
+    prompt = _BASE_SYSTEM_PROMPT
+
+    if mcp_tools:
+        tool_lines = "\n".join(
+            f"- {t.name}: {t.description or 'No description'}" for t in mcp_tools
+        )
+        prompt += f"\n\nMCP tools:\n{tool_lines}"
+
+    skills_prompt = build_skills_prompt()
+    if skills_prompt:
+        prompt += f"\n\nSkills:\n{skills_prompt}"
+
+    return prompt
 
 
 async def build_agent(checkpointer):
@@ -53,6 +63,7 @@ async def build_agent(checkpointer):
    mcp_tools = await get_clearcode_mcp_tools()
    tools = [
        search_codebase,
+       load_skill,
        run_command,
        run_in_directory,
        read_file,

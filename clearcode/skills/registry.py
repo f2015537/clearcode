@@ -137,10 +137,10 @@ class SkillRegistry:
                 line += f" | when_to_use: {when_to_use}"
             lines.append(line)
 
-        # This sentence is the agent's instruction on how to act when it recognises a skill.
         lines.append(
-            "\nWhen the user's request matches a skill, call load_skill(name) "
-            "to get the full instructions before proceeding."
+            "\nIMPORTANT: Before attempting any task whose description or when_to_use "
+            "keywords match the user's request, you MUST call load_skill(name) first to "
+            "load the full instructions. Do not proceed without calling load_skill."
         )
         return "\n".join(lines)
 

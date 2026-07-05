@@ -138,7 +138,15 @@ The agent read `scripts.js` via the filesystem MCP server, found the exact line 
 
 **Skills** — domain knowledge packaged as structured instruction sets, loaded on demand.
 
-Skills live in `.clearcode/skills/<name>/SKILL.md` in the project you're querying. Each skill declares a `when_to_use` field. When the user's request matches, the agent calls `load_skill(name)` to retrieve the full instructions before responding.
+Skills use a three-tier progressive disclosure model to keep token costs low while making full expertise available on demand.
+
+**Tier 1 — always in the system prompt:** A compact index of skill names, descriptions, and `when_to_use` keywords. The agent sees this on every query but pays only a few tokens per skill regardless of how detailed the skill body is.
+
+**Tier 2 — loaded on match:** When the user's request matches a skill's keywords, the agent calls `load_skill(name)` to retrieve the full `SKILL.md` body — complete instructions, decision rules, code templates. This happens once per relevant query, not on every turn.
+
+**Tier 3 — fetched individually:** Skills can ship support files (scripts, templates, reference docs) inside their folder. The agent sees a listing of available files after loading Tier 2 and reads only the ones the task actually needs.
+
+This means a project with twenty specialised skills costs the same as one with zero until a skill is triggered. Skills live in `.clearcode/skills/<name>/SKILL.md` in the project you're querying.
 
 ```
 > /ask I have a 40-page financial report PDF with embedded tables on every

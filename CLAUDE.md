@@ -34,12 +34,11 @@ clearcode/
 │   └── orchestrator.py                # handle_query() entry point (async)
 ├── tools/
 │   ├── retrieval_tools.py             # search_codebase LangChain tool
-│   ├── filesystem_tools.py            # read/write/append/delete/list/exists tools
 │   └── terminal_tools.py             # run_command, run_in_directory tools
 ├── mcp/
 │   ├── clearcode_mcp_client.py        # Connects to MCP servers, returns tools via langchain-mcp-adapters
-│   ├── clearcode_mcp_config.py        # Loads clearcode_mcp_servers.json, resolves ${ENV_VAR} placeholders
-│   └── clearcode_mcp_servers.json     # MCP server definitions (GitHub configured by default)
+│   ├── clearcode_mcp_config.py        # Loads clearcode_mcp_servers.json, resolves ${ENV_VAR} and ${CWD} placeholders
+│   └── clearcode_mcp_servers.json     # MCP server definitions (GitHub + filesystem configured by default)
 ├── memory/
 │   ├── session.py                     # Session ID management (UUID, persisted to .memory/current_session)
 │   └── short_term.py                  # AsyncSqliteSaver path helper + SummarizationMiddleware
@@ -128,9 +127,9 @@ All runtime state (index, memory DB, skills) is stored under `.clearcode/` in th
 - **Indexing**: ChromaDB uses stable chunk IDs (`source::name::start_line`) for idempotent upserts. Qdrant backends use `from_documents()` and check `points_count` to skip re-indexing on startup.
 - **Hybrid RAG**: `hybrid_qdrant.py` stores both dense (OpenAI `text-embedding-3-small`) and sparse (BM25 via `fastembed`) vectors per chunk. `retrieval_mode` in config controls whether queries use dense, sparse, or hybrid fusion at retrieval time.
 - **Factory dispatch**: `indexers/factory.py` and `retrievers/factory.py` select the backend based on `config["rag"]["mode"]` and `config["vector_store"]["provider"]`. Adding a new backend requires a new `*_<backend>.py` pair and a branch in each factory.
-- **Agent**: `factory.py` builds an async `create_agent` with local tools (search, filesystem, terminal), MCP tools loaded at startup, and a `load_skill` tool for progressive skill disclosure. The system prompt is built dynamically — it includes MCP tool names/descriptions and a skills index (name + when_to_use) so the LLM knows what's available without paying the token cost of full skill bodies.
+- **Agent**: `factory.py` builds an async `create_agent` with local tools (search, terminal), MCP tools loaded at startup, and a `load_skill` tool for progressive skill disclosure. The system prompt is built dynamically — it includes MCP tool names/descriptions and a skills index (name + when_to_use) so the LLM knows what's available without paying the token cost of full skill bodies. Filesystem operations are delegated entirely to the filesystem MCP server.
 - **Skills**: `SkillRegistry` scans `.clearcode/skills/` at startup. Each skill is a folder with a `SKILL.md` (YAML frontmatter + instruction body). The agent sees a compact metadata summary in the system prompt (Tier 1), loads the full body via `load_skill` on demand (Tier 2), and reads individual support files via `read_file` if needed (Tier 3).
-- **MCP**: `clearcode_mcp_servers.json` defines MCP servers. `clearcode_mcp_config.py` resolves `${ENV_VAR}` placeholders. `clearcode_mcp_client.py` connects via `langchain-mcp-adapters` at agent startup and returns tools. GitHub MCP server is configured by default — works unauthenticated for public repos; set `GITHUB_TOKEN` in `.env` for private repos and write access.
+- **MCP**: `clearcode_mcp_servers.json` defines MCP servers. `clearcode_mcp_config.py` resolves `${ENV_VAR}` and `${CWD}` placeholders — `${CWD}` is injected at load time so it always resolves to the directory where clearcode was launched. Two servers are configured by default: GitHub (unauthenticated for public repos; set `GITHUB_TOKEN` in `.env` for private repos and write access) and filesystem (scoped to CWD).
 
 ## Known Flaws (not yet fixed)
 
@@ -154,7 +153,7 @@ All runtime state (index, memory DB, skills) is stored under `.clearcode/` in th
 1. Architecture — done
 2. Context layer: indexers + retrievers — **done**
 3. Agent reasoning layer — **done (initial)**
-4. Memory layer — **in progress**
+4. Memory layer — **done (initial)**
 5. MCP integrations — **done (initial)**
 6. Skills — **done (initial)**
 7. Safety, Freshness, Observability

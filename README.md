@@ -90,7 +90,10 @@ This question contains exact identifiers (`_extract_name`, `BLOCK_NODE_TYPES`, `
 | Command | Description |
 |---------|-------------|
 | `/ask <question>` | Ask a question about the indexed codebase |
-| `/show_semantic_index` | Inspect all indexed chunks |
+| `/show_index` | Inspect all indexed chunks |
+| `/new_session` | Start a fresh conversation |
+| `/switch <session_id>` | Resume a past session |
+| `/session` | Show current session ID |
 | `/exit` | Quit |
 
 ---
@@ -106,13 +109,14 @@ clearcode/
 │   ├── indexers/         # AST-aware chunking + ChromaDB / Qdrant backends
 │   └── retrievers/       # Semantic and hybrid retrieval
 │
-├── agent/                # Agent reasoning layer — built (initial)
+├── agent/                # Agent reasoning layer — built
+├── memory/               # Short-term memory + session management — built
+├── mcp/                  # MCP server integrations (GitHub, filesystem) — built
+├── skills/               # Progressive-disclosure skills system — built
+├── tools/                # Local LangChain tools (search, terminal)
 ├── llm/                  # LLM + embedder provider abstraction
 ├── observability/        # Structured logging
 │
-├── memory/               # Short-term + long-term memory        — planned
-├── mcp/                  # MCP server integrations              — planned
-├── skills/               # Higher-level composed capabilities    — planned
 ├── safety/               # Input/output safety guardrails        — planned
 ├── freshness/            # Staleness detection and re-indexing   — planned
 │
@@ -157,6 +161,7 @@ Full series index: [blog.divyampatro.dev/series/clearcode](https://blog.divyampa
 |------|-------|--------|
 | 1 | [Architecture and design decisions before writing any code](https://blog.divyampatro.dev/clearcode-part-1-reverse-engineering-a-coding-agent-before-writing-a-single-line-of-code) | Published |
 | 2 | [Context layer: AST-aware indexing, vector stores, and hybrid retrieval](https://blog.divyampatro.dev/clearcode-part-2-ast-aware-indexing-vector-stores-and-hybrid-retrieval) | Published |
+| 3 | Agent reasoning layer: async agent, tool dispatch, and persistent memory | Coming soon |
 
 ---
 
@@ -165,13 +170,14 @@ Full series index: [blog.divyampatro.dev/series/clearcode](https://blog.divyampa
 | Layer | Technology |
 |-------|-----------|
 | Language | Python 3.12 |
-| Agent orchestration | LangChain |
+| Agent orchestration | LangChain + LangGraph |
 | LLM | OpenAI GPT-4o · Anthropic Claude (configurable) |
 | Embeddings | OpenAI `text-embedding-3-small` · HuggingFace (configurable) |
 | Vector store | Qdrant (hybrid) · ChromaDB (local) |
 | Sparse embeddings | BM25 via fastembed |
 | Code parsing | tree-sitter · tree-sitter-languages (15 languages) |
-| Tool protocol | MCP (upcoming) |
+| Memory | LangGraph `AsyncSqliteSaver` + summarization middleware |
+| Tool protocol | MCP via `langchain-mcp-adapters` (GitHub + filesystem servers) |
 | Evaluation | RAGAS · custom retrieval metrics (upcoming) |
 
 ---

@@ -21,14 +21,22 @@ Companion series: [blog.divyampatro.dev/series/clearcode](https://blog.divyampat
 
 ## What works today
 
-A working RAG-powered code assistant that runs as a local REPL. Point it at any codebase and ask questions — it indexes the source files, embeds them into a vector store, and answers using retrieved context.
+A working code assistant that runs as a local REPL. Point it at any codebase, ask questions, and give it tasks. It indexes the source files, retrieves relevant context, reasons across multiple tool calls, and carries memory across turns.
 
 ```bash
 cd /path/to/your/project
 poetry run clearcode
 ```
 
-The active retrieval mode is controlled by a single config field — `vector_store.retrieval_mode: dense | sparse | hybrid` — and the difference is observable. Here are real examples run against this codebase.
+Four capabilities are live. All examples below are real output run against actual codebases.
+
+**Retrieval** — dense, sparse, and hybrid, all switchable via a single config field.
+
+**Agent reasoning** — chains tool calls to navigate codebases, read files, and trace logic across functions.
+
+**Skills** — domain knowledge packaged as structured instruction sets, loaded on demand when the request matches.
+
+**Memory** — context persists across turns within a session so follow-up questions build on what was already established.
 
 ---
 
@@ -84,6 +92,120 @@ meaningless for JS codebases heavy in functional patterns.
 ```
 
 This question contains exact identifiers (`_extract_name`, `BLOCK_NODE_TYPES`, `arrow_function`) that BM25 pins down, and conceptual reasoning about parent/child AST relationships that dense embeddings surface. Neither mode alone retrieves the full picture.
+
+---
+
+**Agent reasoning** — when retrieval alone isn't enough, the agent chains tool calls to build a complete picture.
+
+```
+> /ask Trace what happens from the moment a user submits the add-task form to
+  when the new task appears on screen. Give me the exact function call chain.
+
+Here's the detailed trace of what happens when a user submits the add-task form:
+
+1. Event Listener and Form Submission
+   The process begins when an event listener captures the form submission event,
+   prevented from its default action via event.preventDefault(). Defined in
+   todo-app/js/scripts.js, lines 102–115.
+
+2. Task Title Extraction and Verification
+   The task title is extracted with taskInput.value.trim(). If the title is
+   empty, focus returns to the input field and the function exits.
+
+3. addTask(title) — lines 73–82
+   Creates a new task object and unshifts it to the front of the tasks array.
+   id is generated with crypto.randomUUID() or String(Date.now()) as a fallback.
+   Calls saveTasks() then renderTasks().
+
+4. saveTasks() — lines 14–16
+   Serialises the tasks array to localStorage under the key "orbitTasks".
+
+5. renderTasks() — lines 38–71
+   Clears the current task list (taskList.innerHTML = ''), re-renders every
+   visible task as a <li> with a check button, title span, and delete button,
+   then calls updateStats() to refresh the counters.
+
+6. Interface Update
+   Input field is cleared and refocused. The empty-state element is toggled
+   based on whether any visible tasks remain.
+```
+
+The agent read `scripts.js` via the filesystem MCP server, found the exact line ranges, and traced the full call chain — not from memory, but from the actual file.
+
+---
+
+**Skills** — domain knowledge packaged as structured instruction sets, loaded on demand.
+
+Skills live in `.clearcode/skills/<name>/SKILL.md` in the project you're querying. Each skill declares a `when_to_use` field. When the user's request matches, the agent calls `load_skill(name)` to retrieve the full instructions before responding.
+
+```
+> /ask I have a 40-page financial report PDF with embedded tables on every
+  page. I need to extract all of them into a single pandas DataFrame.
+
+To extract tables from a multi-page PDF into a single DataFrame, use pdfplumber:
+
+    import pdfplumber
+    import pandas as pd
+
+    with pdfplumber.open("your_report.pdf") as pdf:
+        all_tables = []
+        for page in pdf.pages:
+            tables = page.extract_tables()
+            for table in tables:
+                if table:
+                    df = pd.DataFrame(table[1:], columns=table[0])
+                    all_tables.append(df)
+
+    combined_df = pd.concat(all_tables, ignore_index=True)
+
+pdfplumber preserves table geometry better than pypdf for dense financial
+layouts. If a page has no discernible table structure, extract_tables()
+returns an empty list — the guard (if table) handles that safely.
+```
+
+The `pdf` skill was loaded from `.clearcode/skills/pdf/SKILL.md`. The agent did not guess at the approach — it followed instructions that encode hard-won knowledge about which library to use and why.
+
+---
+
+**Memory** — context carries across turns within a session, stored in SQLite via LangGraph checkpointing.
+
+```
+> /ask What is the name of the localStorage key this app uses, and what does
+  each task object look like — list its exact fields?
+
+The localStorage key is "orbitTasks".
+
+Each task object has three fields:
+  - id        unique identifier — crypto.randomUUID() with Date.now() fallback
+  - title     the text of the task
+  - completed boolean
+
+> /ask Perfect. Now I want to support multiple named lists (Work, Personal).
+  Using the storage key you just identified, propose the minimal change.
+
+Instead of the single key "orbitTasks", use a dynamic key based on the list
+name — "orbitTasks-Work", "orbitTasks-Personal", and so on.
+
+Two functions need to change:
+
+    function saveTasks(listName) {
+        localStorage.setItem(`orbitTasks-${listName}`, JSON.stringify(tasks));
+    }
+
+    function addTask(title, listName) {
+        tasks.unshift({
+            id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+            title,
+            completed: false
+        });
+        saveTasks(listName);
+        renderTasks();
+    }
+
+Everything else — toggleTask, deleteTask, renderTasks — remains unchanged.
+```
+
+The second answer picks up `"orbitTasks"` from the first without re-searching. Sessions persist to `.clearcode/memory/memory.db` and can be resumed with `/switch <session_id>`.
 
 ---
 

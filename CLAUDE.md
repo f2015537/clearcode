@@ -133,20 +133,21 @@ All runtime state (index, memory DB, skills) is stored under `.clearcode/` in th
 
 ## Known Flaws (not yet fixed)
 
-- ~~Agent and LLM client are rebuilt on every `/ask`~~ — fixed, agent is now built once at startup via `AsyncSqliteSaver` context manager.
 - Retriever opens a new DB client on every query — should reuse the connection from indexing.
 - Both factory files silently fall through to ChromaDB for unknown provider names — should raise `ValueError`.
-- ~~`_sliding_window` raises `ValueError` on empty files~~ — fixed, now returns `[]`.
 - `show_index` in `semantic_chroma.py` fetches all embedding vectors into memory — wasteful for large collections.
 - Qdrant indexers batch all docs before upserting — no partial progress on failure.
-- ~~`get_checkpointer()` opens a new SQLite connection on every call~~ — fixed, `AsyncSqliteSaver` is now managed as a context manager in `_run_async` and shared across the session.
-- ~~`get_session_history()` in `short_term.py` is defined but never called~~ — removed.
-- `memory.db_path` in `config.yaml` is CWD-relative — running `clearcode` from different directories creates separate `.memory/` folders with no session continuity across projects.
+- `memory.db_path` in `config.yaml` is CWD-relative — running `clearcode` from different directories creates separate `.clearcode/memory/` folders with no session continuity across projects.
 - `llm` and `embedder` returned from `initialize()` in `main.py` are never used downstream — the agent constructs its own copies per query.
 - `show_index` in Qdrant backends hardcodes `limit=1000` — silently truncates for large collections.
 - `switch_session` in `main.py` accepts any arbitrary string with no validation that the thread ID exists in the SQLite DB — passing a non-existent ID silently starts a blank conversation.
-- ~~`_build_system_prompt` in `agent/factory.py` formats MCP tool descriptions without guarding against `None`~~ — fixed, falls back to `"No description"`.
 - `rich.Prompt.ask()` is synchronous blocking I/O called inside `async def _run_async` — blocks the event loop while waiting for user input.
+- `MultiServerMCPClient` in `clearcode_mcp_client.py` is not used as an async context manager — the MCP stdio subprocesses (npx) are started but never explicitly terminated, leaking processes for the lifetime of the REPL.
+- `get_clearcode_mcp_tools()` has no per-server error isolation — if any one MCP server fails to start (e.g. `npx` not installed, malformed config), the entire call fails and the agent cannot start at all.
+- `_BLOCKED_COMMANDS` in `terminal_tools.py` is trivially bypassed — only exact string matches are checked, so `rm -rf /home/` or `sudo rm -rf ~` are not caught. `shell=True` in `subprocess.run` also means shell metacharacters in LLM-generated commands are a latent injection vector.
+- `handle_query` in `orchestrator.py` catches all exceptions and returns a generic error string — when a LangGraph checkpoint is corrupted (crash mid-tool-call), the user sees `"Error: ..."` with no hint that deleting `.clearcode/memory/memory.db` would recover the session.
+- No `KeyboardInterrupt` handling in `_run_async` — Ctrl+C during an `await handle_query(...)` call propagates up through the `AsyncSqliteSaver` context manager; any in-flight SQLite write may be left inconsistent.
+- `SummarizationMiddleware` is imported from `langchain.agents.middleware`, a non-standard module path not present in mainline LangChain — if the `middleware=` parameter to `create_agent()` is also non-standard, summarization may be silently not applied on LangChain version updates.
 
 ## Build Order
 

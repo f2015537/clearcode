@@ -38,6 +38,8 @@ Four capabilities are live. All examples below are real output run against actua
 
 **Memory** — context persists across turns within a session so follow-up questions build on what was already established.
 
+**MCP** — the agent reaches beyond the local filesystem through Model Context Protocol servers. GitHub and filesystem ship by default; adding any new server is a one-line config change.
+
 ---
 
 **Dense retrieval** — semantic similarity. Best for conceptual and design questions where exact wording doesn't match the source.
@@ -206,6 +208,41 @@ Everything else — toggleTask, deleteTask, renderTasks — remains unchanged.
 ```
 
 The second answer picks up `"orbitTasks"` from the first without re-searching. Sessions persist to `.clearcode/memory/memory.db` and can be resumed with `/switch <session_id>`.
+
+---
+
+**MCP** — the agent reaches beyond the local filesystem through Model Context Protocol servers, configured in a single JSON file.
+
+Two servers ship by default: a GitHub server (public repos work unauthenticated; add `GITHUB_TOKEN` for private repos and write access) and a filesystem server scoped to the CWD at launch. Adding a new server — Jira, Linear, Slack, a database — is a one-entry change in `clearcode_mcp_servers.json`. The agent picks it up at next startup with no code changes required.
+
+```
+> /ask Go to the GitHub repo f2015537/clearcode and look at the last 5 commits
+  on main. Summarise what has been built layer by layer.
+
+Here is a summary of the last 5 commits on the main branch:
+
+• cf98612 — "Add agent, skills, and memory examples to README"
+  Documents the system's live capabilities with real output — code navigation,
+  skill-driven answers, and session memory continuity.
+
+• 6dd6b3e — "Update CLAUDE.md and README to reflect current project state"
+  Marks agent, memory, MCP, and skills layers complete. Removes the local
+  filesystem tools now covered by the filesystem MCP server.
+
+• d9db21f — "Add filesystem MCP server; remove local filesystem tools"
+  Shifts filesystem operations to a centralised MCP server scoped to CWD —
+  same capabilities, no bespoke tool code to maintain.
+
+• 914e491 — "Strengthen skill trigger with imperative load_skill instruction"
+  Makes skill activation directive rather than suggestive, ensuring the agent
+  reliably loads instructions before acting on a matched request.
+
+• c839221 — "Update CLAUDE.md to reflect skills, MCP, and async agent state"
+  Aligns documentation with the async agent, skills registry, and MCP wiring
+  added in the preceding commits.
+```
+
+The agent called the GitHub MCP's `list_commits` tool, retrieved live data from the API, and composed the summary — no local git history involved.
 
 ---
 

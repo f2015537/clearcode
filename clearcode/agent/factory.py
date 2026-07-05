@@ -7,14 +7,6 @@ from clearcode.observability.logger import get_logger
 
 from clearcode.memory.short_term import get_summarization_middleware
 from clearcode.tools.terminal_tools import run_command, run_in_directory
-from clearcode.tools.filesystem_tools import (
-    read_file,
-    write_file,
-    append_file,
-    delete_file,
-    list_directory,
-    file_exists,
-)
 from clearcode.mcp.clearcode_mcp_client import get_clearcode_mcp_tools
 from clearcode.skills.skill_tools import load_skill, build_skills_prompt
 
@@ -27,12 +19,11 @@ You have the following tools available:
 
 Local tools:
 - search_codebase: Semantic search over indexed source files. Always use this first when answering questions about the code.
-- read_file: Read any file by absolute path. Use when search results reference a file you need to inspect in full.
-- write_file / append_file: Write or append to files. Only use when explicitly asked to make changes.
-- delete_file: Delete a file. Only use when explicitly asked.
-- list_directory: List directory contents. Use to explore project structure.
 - run_command: Run a shell command. Use for tasks like running tests, checking git status, or inspecting build output.
 - run_in_directory: Run a shell command in a specific directory.
+
+Filesystem tools are available via MCP — use them to read, write, and navigate files when needed.
+GitHub tools are available via MCP — use them to interact with GitHub repositories: list issues, create PRs, read file contents, search code, and more.
 
 Guidelines:
 - Always search_codebase before answering questions about the code.
@@ -66,12 +57,6 @@ async def build_agent(checkpointer):
        load_skill,
        run_command,
        run_in_directory,
-       read_file,
-       write_file,
-       append_file,
-       delete_file,
-       list_directory,
-       file_exists,
        *mcp_tools,
    ]
    middleware = get_summarization_middleware(llm)

@@ -328,7 +328,7 @@ Full series index: [blog.divyampatro.dev/series/clearcode](https://blog.divyampa
 |------|-------|--------|
 | 1 | [Architecture and design decisions before writing any code](https://blog.divyampatro.dev/clearcode-part-1-reverse-engineering-a-coding-agent-before-writing-a-single-line-of-code) | Published |
 | 2 | [Context layer: AST-aware indexing, vector stores, and hybrid retrieval](https://blog.divyampatro.dev/clearcode-part-2-ast-aware-indexing-vector-stores-and-hybrid-retrieval) | Published |
-| 3 | Agent reasoning layer: async agent, tool dispatch, and persistent memory | Coming soon |
+| 3 | [Agent reasoning layer: async agent, tool dispatch, and persistent memory](https://blog.divyampatro.dev/clearcode-part-3-memory-agent-reasoning-skills-and-mcp) | Published |
 
 ---
 

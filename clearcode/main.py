@@ -114,10 +114,10 @@ async def _run_async():
                     "  [bold]/session[/bold]                 — show current session id"
                 )
                 console.print(
-                    "  [bold]/plan <goal>[/bold] — generate and execute a plan"
+                    "  [bold]/plan <goal>[/bold]             — generate and execute a plan"
                 )
                 console.print(
-                    "  [bold]/task_status[/bold] — show task progress for active project"
+                    "  [bold]/task_status[/bold]             — show task progress for active project"
                 )
 
 

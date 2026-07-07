@@ -9,10 +9,11 @@ from clearcode.observability.logger import get_logger
 logger = get_logger(__name__)
 
 
-def index_codebase(repo_path: str) -> chromadb.Collection:
+def index_codebase(repo_path: str, force: bool = False) -> chromadb.Collection:
     """
     Parse all source files in repo_path, embed each chunk and store in ChromaDB.
-    Returns the ChromaDB collection. Skips indexing if collection already has data.
+    Returns the ChromaDB collection. Skips indexing if collection already has data
+    unless force=True (used after /plan to pick up newly generated files).
     """
     embedder = get_embedder()
     chroma_client = chromadb.PersistentClient(path=config["chromadb"]["persist_dir"])
@@ -20,7 +21,7 @@ def index_codebase(repo_path: str) -> chromadb.Collection:
         name=config["chromadb"]["collection_name"]
     )
 
-    if collection.count() > 0:
+    if not force and collection.count() > 0:
         logger.info(f"Loaded existing index with {collection.count()} chunks")
         return collection
 

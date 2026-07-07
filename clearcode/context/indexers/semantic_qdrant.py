@@ -12,10 +12,11 @@ from clearcode.observability.logger import get_logger
 logger = get_logger(__name__)
 
 
-def index_codebase(repo_path: str) -> QdrantVectorStore:
+def index_codebase(repo_path: str, force: bool = False) -> QdrantVectorStore:
     """
     Parse all source files in repo_path, embed each chunk and store in Qdrant.
-    Returns the QdrantVectorStore. Skips indexing if collection already has data.
+    Returns the QdrantVectorStore. Skips indexing if collection already has data
+    unless force=True (used after /plan to pick up newly generated files).
     """
     embedder = get_embedder()
     collection_name = config["qdrant"]["collection_name"]
@@ -25,7 +26,7 @@ def index_codebase(repo_path: str) -> QdrantVectorStore:
     # Check if collection already has data
     client = QdrantClient(url=url, api_key=api_key)
     existing = [c.name for c in client.get_collections().collections]
-    if collection_name in existing:
+    if not force and collection_name in existing:
         info = client.get_collection(collection_name)
         if info.points_count > 0:
             logger.info(f"Loaded existing index with {info.points_count} chunks")

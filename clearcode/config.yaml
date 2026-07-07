@@ -23,6 +23,7 @@ elasticsearch:
 llm:
   provider: openai # openai | anthropic
   model: gpt-4o
+  judge_model: gpt-4o-mini # cheaper model used only for LLM-as-judge
 
 memory:
   db_path: .clearcode/memory/memory.db
@@ -31,3 +32,6 @@ memory:
 
 skills:
   skills_dir: .clearcode/skills
+
+tasks:
+  db_path: .clearcode/tasks/tasks.db

@@ -11,9 +11,12 @@ logger = get_logger(__name__)
 
 def get_checkpointer_db_path() -> str:
   db_path = config["memory"]["db_path"]
-  Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-  logger.info(f"Using SQLite checkpointer at {db_path}")
-  return db_path
+  # Resolve to absolute so Path.mkdir(parents=True) works reliably on macOS
+  # when none of the ancestor directories exist yet.
+  abs_path = (Path.cwd() / db_path).resolve()
+  abs_path.parent.mkdir(parents=True, exist_ok=True)
+  logger.info(f"Using SQLite checkpointer at {abs_path}")
+  return str(abs_path)
   
 
 def get_summarization_middleware(llm=None) -> SummarizationMiddleware:

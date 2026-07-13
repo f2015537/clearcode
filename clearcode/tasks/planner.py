@@ -47,7 +47,7 @@ ExecutionPlan broken into concrete tasks for an AI agent to implement.
 
 
 Rules:
-- 5 to 20 tasks
+- 5 to 8 tasks maximum — keep the plan tight and focused
 - Task IDs must be stable snake_case: task_001, task_002, ...
 - depends_on must reference valid task IDs in the same plan
 - Ordering must form a valid DAG (no cycles): architecture → schema → config → core → tests → integration

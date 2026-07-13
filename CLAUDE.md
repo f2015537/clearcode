@@ -8,7 +8,7 @@ ClearCode is a build-in-public project to reverse-engineering a production-grade
 
 ## Current State
 
-The context, agent, memory, MCP, and skills layers are implemented and wired together into a working RAG-powered code assistant REPL. Three vector store backends are supported (ChromaDB, Qdrant semantic, Qdrant hybrid), all switchable via config. The agent is fully async, connects to MCP servers at startup, and supports a progressive-disclosure skills system.
+The context, agent, memory, MCP, skills, and tasks layers are implemented and wired together. Three vector store backends are supported (ChromaDB, Qdrant semantic, Qdrant hybrid), all switchable via config. The agent is fully async, connects to MCP servers at startup, and supports a progressive-disclosure skills system. The tasks layer adds autonomous multi-step plan execution: the LLM produces a structured `ExecutionPlan`, the user approves it, and an orchestrator executes tasks serially with dependency resolution, retry logic, and an LLM-as-judge per task.
 
 ```
 clearcode/
@@ -45,6 +45,13 @@ clearcode/
 ├── skills/
 │   ├── registry.py                    # SkillRegistry — scans .clearcode/skills/, parses SKILL.md frontmatter
 │   └── skill_tools.py                 # load_skill @tool + singleton get_registry() + build_skills_prompt()
+├── tasks/
+│   ├── planner.py                     # create_plan() — LLM → structured ExecutionPlan (Pydantic)
+│   ├── approval.py                    # present_plan_for_approval() — Rich table + A/M/R loop
+│   ├── task_store.py                  # SQLiteTaskStore — WAL mode, atomic state transitions, retry logic
+│   ├── executor.py                    # run_subtask_agent() — per-task agent + LLM-as-judge
+│   ├── orchestrator.py                # TaskOrchestrator + handle_plan_command() — dependency loop, recovery
+│   └── recovery.py                    # RecoveryManager — resets IN_PROGRESS → PENDING on restart
 └── observability/
     └── logger.py                      # Root logger at WARNING, clearcode loggers at DEBUG
 ```
@@ -115,6 +122,8 @@ All runtime state (index, memory DB, skills) is stored under `.clearcode/` in th
 | Command | Description |
 |---------|-------------|
 | `/ask <question>` | Ask a question about the codebase |
+| `/plan <goal>` | Generate, approve, and execute an autonomous multi-step plan |
+| `/task_status` | Show progress table for the active project |
 | `/show_index` | Dump all indexed chunks |
 | `/new_session` | Start a fresh conversation |
 | `/switch <session_id>` | Resume a past session |
@@ -124,12 +133,22 @@ All runtime state (index, memory DB, skills) is stored under `.clearcode/` in th
 ## Architecture Notes
 
 - **Chunking**: `code_parser.py` uses tree-sitter for AST-aware chunking across 15 languages. Falls back to a sliding window (50 lines, 10-line overlap) for text/config files and files with no extractable AST blocks. tree-sitter returns byte offsets — all slicing is done on `source_bytes` (not the decoded `str`) to avoid truncation with multi-byte characters.
-- **Indexing**: ChromaDB uses stable chunk IDs (`source::name::start_line`) for idempotent upserts. Qdrant backends use `from_documents()` and check `points_count` to skip re-indexing on startup.
+- **Indexing**: ChromaDB uses stable chunk IDs (`source::name::start_line`) for idempotent upserts. Qdrant backends use `from_documents()` and check `points_count` to skip re-indexing on startup. All three backends accept a `force=True` parameter that bypasses the skip-if-exists guard — used after `/plan` so newly generated files are immediately queryable via `/ask`.
 - **Hybrid RAG**: `hybrid_qdrant.py` stores both dense (OpenAI `text-embedding-3-small`) and sparse (BM25 via `fastembed`) vectors per chunk. `retrieval_mode` in config controls whether queries use dense, sparse, or hybrid fusion at retrieval time.
 - **Factory dispatch**: `indexers/factory.py` and `retrievers/factory.py` select the backend based on `config["rag"]["mode"]` and `config["vector_store"]["provider"]`. Adding a new backend requires a new `*_<backend>.py` pair and a branch in each factory.
 - **Agent**: `factory.py` builds an async `create_agent` with local tools (search, terminal), MCP tools loaded at startup, and a `load_skill` tool for progressive skill disclosure. The system prompt is built dynamically — it includes MCP tool names/descriptions and a skills index (name + when_to_use) so the LLM knows what's available without paying the token cost of full skill bodies. Filesystem operations are delegated entirely to the filesystem MCP server.
 - **Skills**: `SkillRegistry` scans `.clearcode/skills/` at startup. Each skill is a folder with a `SKILL.md` (YAML frontmatter + instruction body). The agent sees a compact metadata summary in the system prompt (Tier 1), loads the full body via `load_skill` on demand (Tier 2), and reads individual support files via `read_file` if needed (Tier 3).
 - **MCP**: `clearcode_mcp_servers.json` defines MCP servers. `clearcode_mcp_config.py` resolves `${ENV_VAR}` and `${CWD}` placeholders — `${CWD}` is injected at load time so it always resolves to the directory where clearcode was launched. Two servers are configured by default: GitHub (unauthenticated for public repos; set `GITHUB_TOKEN` in `.env` for private repos and write access) and filesystem (scoped to CWD).
+- **Tasks layer**: `planner.py` calls the LLM with `response_format=ExecutionPlan` (structured output) to produce a typed DAG of `PlannedTask` objects. `approval.py` renders the plan as a Rich table and loops until the user approves (A), modifies (M), or rejects (R). `task_store.py` persists the approved plan to SQLite (WAL mode) and manages all state transitions atomically. `executor.py` builds a fresh agent per task with a least-privilege tool set keyed on `task_type`, then runs an LLM-as-judge to verify the output against `acceptance_criteria` before marking the task complete. `orchestrator.py` loops over ready tasks (all deps completed/skipped), dispatches them serially, and handles retries via `fail_task`'s SQL CASE logic. `recovery.py` resets any `IN_PROGRESS` tasks to `PENDING` on restart so crashed runs can resume cleanly.
+
+## Tasks Layer Config
+
+```yaml
+tasks:
+  db_path: .clearcode/tasks/tasks.db   # CWD-relative — separate DB per project directory
+```
+
+Add this block to `config.yaml` to control where the task store lives. `db_path` is resolved relative to CWD at startup.
 
 ## Known Flaws (not yet fixed)
 
@@ -148,6 +167,9 @@ All runtime state (index, memory DB, skills) is stored under `.clearcode/` in th
 - `handle_query` in `orchestrator.py` catches all exceptions and returns a generic error string — when a LangGraph checkpoint is corrupted (crash mid-tool-call), the user sees `"Error: ..."` with no hint that deleting `.clearcode/memory/memory.db` would recover the session.
 - No `KeyboardInterrupt` handling in `_run_async` — Ctrl+C during an `await handle_query(...)` call propagates up through the `AsyncSqliteSaver` context manager; any in-flight SQLite write may be left inconsistent.
 - `SummarizationMiddleware` is imported from `langchain.agents.middleware`, a non-standard module path not present in mainline LangChain — if the `middleware=` parameter to `create_agent()` is also non-standard, summarization may be silently not applied on LangChain version updates.
+- LLM planner occasionally generates duplicate task `id` values (e.g. two tasks both named `task_005`). `create_project` does a direct INSERT with no deduplication guard, so SQLite raises `UNIQUE constraint failed: tasks.id` after the user has already approved — the entire run is lost.
+- `fail_task` increments `retry_count` unconditionally before checking `max_retries`, so a task that exhausts all retries ends up with `retry_count = max_retries + 1` in the DB.
+- `get_dep_results` only returns `id`, `title`, and `result` — it omits `output_files`. Downstream agents therefore cannot read the actual files written by dependency tasks; they only see the text summary stored in `result`.
 
 ## Build Order
 
@@ -157,7 +179,8 @@ All runtime state (index, memory DB, skills) is stored under `.clearcode/` in th
 4. Memory layer — **done (initial)**
 5. MCP integrations — **done (initial)**
 6. Skills — **done (initial)**
-7. Safety, Freshness, Observability
-8. Eval layer
+7. Tasks layer — **done (initial)**
+8. Safety, Freshness, Observability
+9. Eval layer
 
 When adding code, match the layer currently being built in the blog series. Don't implement future layers ahead of the companion post.

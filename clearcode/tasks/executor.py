@@ -83,6 +83,10 @@ def _build_system_prompt(task: dict, dep_outputs: list[dict]) -> str:
    return f"""You are an expert software engineer executing a single well-defined task.
 Be thorough and complete. Always write all files to disk before finishing.
 
+CONSTRAINTS:
+- Only write TEXT files (.html, .css, .js, .ts, .py, .go, .md, .json, .yaml, .txt, etc.)
+- NEVER attempt to create binary files (images, fonts, PDFs, executables, .png, .jpg, .gif, .woff, etc.)
+- If a design calls for images, use CSS gradients, SVG inline in HTML, or placeholder <div> blocks instead.
 
 TASK ID:   {task['id']}
 TASK TYPE: {task['task_type']}
@@ -184,7 +188,7 @@ async def run_subtask_agent(task: dict, dep_outputs: list[dict] | None = None) -
    model    = config["llm"]["model"]
 
 
-   llm = init_chat_model(f"{provider}:{model}", temperature=0, max_tokens=3000)
+   llm = init_chat_model(f"{provider}:{model}", temperature=0, max_tokens=16000)
 
 
    tools         = _TOOLS_BY_TYPE.get(task.get("task_type", ""), _DEFAULT_TOOLS)
@@ -229,17 +233,30 @@ async def run_subtask_agent(task: dict, dep_outputs: list[dict] | None = None) -
        return content or ""
 
 
-   # The final AIMessage can be empty for reasoning models (reasoning tokens are internal).
-   # Walk backwards to find the last message that actually has visible content.
+   # The final AIMessage can be empty when a model stops immediately after a tool
+   # call without producing a text summary (common with gpt-4o).
+   # Walk backwards for the last AIMessage with visible content.
    output = next(
        (_get_content(msg) for msg in reversed(final_state["messages"])
         if type(msg).__name__ == "AIMessage" and _get_content(msg).strip()),
        ""
    )
 
-
+   # Fallback: if no text output, synthesise a summary from write_file tool calls.
+   # This keeps the task alive instead of burning retries on a formatting quirk.
    if not output.strip():
-       raise ValueError("Agent returned empty output — it did not write any files or produce a summary")
+       written = [
+           tc["args"].get("path", "?")
+           for msg in final_state["messages"]
+           if type(msg).__name__ == "AIMessage"
+           for tc in (getattr(msg, "tool_calls", None) or [])
+           if tc.get("name") == "write_file"
+       ]
+       if written:
+           output = "Files written by agent:\n" + "\n".join(f"  - {p}" for p in written)
+           logger.info(f"Task {task['id']} produced no summary text; synthesised from {len(written)} write_file call(s)")
+       else:
+           raise ValueError("Agent returned empty output — it did not write any files or produce a summary")
 
 
    logger.info(f"Task {task['id']} agent returned {len(output)} chars")

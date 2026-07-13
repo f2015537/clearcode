@@ -28,7 +28,7 @@ cd /path/to/your/project
 poetry run clearcode
 ```
 
-Four capabilities are live. All examples below are real output run against actual codebases.
+Five capabilities are live. All examples below are real output run against actual codebases.
 
 **Retrieval** — dense, sparse, and hybrid, all switchable via a single config field.
 
@@ -39,6 +39,8 @@ Four capabilities are live. All examples below are real output run against actua
 **Memory** — context persists across turns within a session so follow-up questions build on what was already established.
 
 **MCP** — the agent reaches beyond the local filesystem through Model Context Protocol servers. GitHub and filesystem ship by default; adding any new server is a one-line config change.
+
+**Autonomous task execution** — describe a goal, review the plan, and the agent implements it end-to-end: structured plan generation, human-in-the-loop approval, serial execution with dependency resolution, LLM-as-judge verification per task, and automatic retry.
 
 ---
 
@@ -254,9 +256,59 @@ The agent called the GitHub MCP's `list_commits` tool, retrieved live data from 
 
 ---
 
+**Autonomous task execution** — describe a goal once, review the generated plan, and the agent does the work.
+
+![ClearCode /plan demo](demo/clearcode-plan-opt.gif)
+
+```
+> /plan create a portfolio website for a backend engineer with 8 years of
+  experience using HTML, CSS, and JavaScript
+
+Planning with LLM...
+
+Plan: backend_engineer_portfolio
+Goal: Professional portfolio site with dark theme, hero, skills, timeline,
+      projects, and contact section.
+Stack: HTML · CSS · JavaScript | Est: 7.5h
+
+  ID        Type        Title                                      Depends on
+  task_001  design      Define site content architecture           —
+  task_002  implement   Create semantic HTML page structure        task_001
+  task_003  configure   Configure design tokens and dark theme     task_002
+  task_004  implement   Style hero, navigation, and header         task_003
+  task_005  implement   Style content sections                     task_003
+  task_006  implement   Smooth scroll and active nav behavior      task_002, task_004
+  task_007  implement   Animations and scroll reveal               task_005, task_006
+  task_008  implement   Responsive layout refinements              task_004, task_005
+  task_009  review      Accessibility and SEO pass                 task_002, task_006
+  task_010  test        Validate HTML and CSS quality              task_008, task_009
+  task_011  test        Test responsive behavior                   task_010
+  task_012  integrate   Final integration and delivery check       task_011
+
+[A]pprove / [M]odify task / [R]eject and re-plan: A
+
+▶ Starting: [task_001] Define site content architecture
+✅ Completed: [task_001] Define site content architecture
+▶ Starting: [task_002] Create semantic HTML page structure
+✅ Completed: [task_002] Create semantic HTML page structure
+...
+✅ Completed: [task_012] Final integration and delivery check
+
+🎉 All 12 tasks completed successfully!
+
+Re-indexing generated files so /ask can query them...
+✓ Index updated — you can now use /ask to ask about the generated code.
+```
+
+Each task runs in its own agent instance with a least-privilege tool set. An LLM judge verifies the output against the task's acceptance criteria before the orchestrator moves on. Failed tasks retry up to three times before being marked failed. After the run, `/ask` queries work against the generated files immediately.
+
+---
+
 | Command | Description |
 |---------|-------------|
 | `/ask <question>` | Ask a question about the indexed codebase |
+| `/plan <goal>` | Generate, approve, and execute a multi-step plan |
+| `/task_status` | Show progress table for the active project |
 | `/show_index` | Inspect all indexed chunks |
 | `/new_session` | Start a fresh conversation |
 | `/switch <session_id>` | Resume a past session |
@@ -280,6 +332,14 @@ clearcode/
 ├── memory/               # Short-term memory + session management — built
 ├── mcp/                  # MCP server integrations (GitHub, filesystem) — built
 ├── skills/               # Progressive-disclosure skills system — built
+├── tasks/                # Autonomous task execution layer — built
+│   ├── planner.py        # LLM → structured ExecutionPlan (Pydantic)
+│   ├── approval.py       # Human-in-the-loop plan review (A/M/R)
+│   ├── task_store.py     # SQLite WAL store + atomic state transitions
+│   ├── executor.py       # Per-task agent + LLM-as-judge
+│   ├── orchestrator.py   # Dependency loop, retry, re-index after run
+│   └── recovery.py       # Reset crashed IN_PROGRESS tasks on restart
+│
 ├── tools/                # Local LangChain tools (search, terminal)
 ├── llm/                  # LLM + embedder provider abstraction
 ├── observability/        # Structured logging
@@ -329,6 +389,7 @@ Full series index: [blog.divyampatro.dev/series/clearcode](https://blog.divyampa
 | 1 | [Architecture and design decisions before writing any code](https://blog.divyampatro.dev/clearcode-part-1-reverse-engineering-a-coding-agent-before-writing-a-single-line-of-code) | Published |
 | 2 | [Context layer: AST-aware indexing, vector stores, and hybrid retrieval](https://blog.divyampatro.dev/clearcode-part-2-ast-aware-indexing-vector-stores-and-hybrid-retrieval) | Published |
 | 3 | [Memory, MCP, and skills: turning a RAG pipeline into an autonomous coding agent](https://blog.divyampatro.dev/clearcode-part-3-memory-agent-reasoning-skills-and-mcp) | Published |
+| 4 | Tasks layer: autonomous plan execution, LLM-as-judge, and human-in-the-loop approval | Coming soon |
 
 ---
 

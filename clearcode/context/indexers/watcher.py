@@ -24,8 +24,8 @@ logger = get_logger(__name__)
 # A watchdog Observer runs in a background daemon thread watching the
 # project directory recursively. When a file changes, the OS fires an
 # event → _CodebaseEventHandler receives it → debounces it (editors
-# emit multiple events per save) → calls index_single_file() or
-# remove_file_from_index() from semantic_chroma.py.
+# emit multiple events per save) → calls the right index_single_file()
+# or remove_file_from_index() for the active backend via factory.py.
 #
 # This keeps ChromaDB up-to-date in real time so /ask queries reflect
 # changes made by /plan tasks or manual edits without needing a restart.

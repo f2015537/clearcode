@@ -310,6 +310,7 @@ Each task runs in its own agent instance with a least-privilege tool set. An LLM
 | `/plan <goal>` | Generate, approve, and execute a multi-step plan |
 | `/task_status` | Show progress table for the active project |
 | `/show_index` | Inspect all indexed chunks |
+| `/reindex` | Force a full incremental re-index of the current directory |
 | `/new_session` | Start a fresh conversation |
 | `/switch <session_id>` | Resume a past session |
 | `/session` | Show current session ID |
@@ -325,7 +326,7 @@ The system is decomposed into focused, independently testable layers. Each layer
 clearcode/
 │
 ├── context/              # Context layer — built
-│   ├── indexers/         # AST-aware chunking + ChromaDB / Qdrant backends
+│   ├── indexers/         # AST-aware chunking + ChromaDB / Qdrant backends + real-time watcher
 │   └── retrievers/       # Semantic and hybrid retrieval
 │
 ├── agent/                # Agent reasoning layer — built
@@ -366,9 +367,13 @@ The context layer is the foundation everything else builds on. Getting it right 
 
 | Backend | Mode | Notes |
 |---------|------|-------|
-| ChromaDB | Dense | Local, no cloud account needed |
+| ChromaDB | Dense | Local, no cloud account needed. Incremental (mtime-based) — unchanged files skipped. |
 | Qdrant (semantic) | Dense | Cloud-hosted, pure embedding similarity |
 | Qdrant (hybrid) | Dense + BM25 sparse | Best retrieval quality — active default |
+
+The ChromaDB backend tracks each file's `mtime` in chunk metadata. On startup and `/reindex`, it skips unchanged files, re-embeds changed files (deleting old chunks first), and prunes chunks for deleted files — so repeated runs are fast and cost nothing for files that haven't changed.
+
+**Real-time watcher** — A `watchdog` filesystem observer runs in a background thread from the moment the REPL starts. When any source file is created, modified, renamed, or deleted, the watcher debounces the event (1.5 s) and calls the correct backend's `index_single_file()` or `remove_file_from_index()` via the factory. The index stays current without any manual command — including files written by `/plan` tasks mid-execution.
 
 **Hybrid retrieval** — The Qdrant hybrid backend stores two vector representations per chunk: a dense embedding from `text-embedding-3-small` capturing semantic meaning, and a sparse BM25 vector capturing exact keyword overlap. At query time, both are scored and fused. This catches cases where pure semantic search misses exact identifiers or rare terms, and where keyword search misses conceptually related code.
 
@@ -389,7 +394,7 @@ Full series index: [blog.divyampatro.dev/series/clearcode](https://blog.divyampa
 | 1 | [Architecture and design decisions before writing any code](https://blog.divyampatro.dev/clearcode-part-1-reverse-engineering-a-coding-agent-before-writing-a-single-line-of-code) | Published |
 | 2 | [Context layer: AST-aware indexing, vector stores, and hybrid retrieval](https://blog.divyampatro.dev/clearcode-part-2-ast-aware-indexing-vector-stores-and-hybrid-retrieval) | Published |
 | 3 | [Memory, MCP, and skills: turning a RAG pipeline into an autonomous coding agent](https://blog.divyampatro.dev/clearcode-part-3-memory-agent-reasoning-skills-and-mcp) | Published |
-| 4 | Tasks layer: autonomous plan execution, LLM-as-judge, and human-in-the-loop approval | Coming soon |
+| 4 | [Tasks layer: autonomous plan execution, LLM-as-judge, and human-in-the-loop approval](https://blog.divyampatro.dev/clearcode-part-4-autonomous-plan-execution-llm-as-judge-and-human-in-the-loop-approval) | Published |
 
 ---
 

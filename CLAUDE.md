@@ -19,11 +19,12 @@ clearcode/
 │   └── factory.py                     # Provider-dispatched LLM and embedder factories
 ├── context/
 │   ├── indexers/
-│   │   ├── factory.py                 # Dispatches to the right indexer by rag.mode + provider
+│   │   ├── factory.py                 # Dispatches to the right indexer/watcher handler by rag.mode + provider
 │   │   ├── code_parser.py             # AST chunking (tree-sitter) + sliding window fallback
-│   │   ├── semantic_chroma.py         # Dense indexing into ChromaDB
+│   │   ├── semantic_chroma.py         # Incremental (mtime-based) dense indexing into ChromaDB
 │   │   ├── semantic_qdrant.py         # Dense indexing into Qdrant
-│   │   └── hybrid_qdrant.py          # Dense + sparse (BM25) indexing into Qdrant
+│   │   ├── hybrid_qdrant.py          # Dense + sparse (BM25) indexing into Qdrant
+│   │   └── watcher.py                 # Watchdog observer — real-time per-file re-indexing on save
 │   └── retrievers/
 │       ├── factory.py                 # Dispatches to the right retriever by rag.mode + provider
 │       ├── semantic_chroma.py         # Dense retrieval from ChromaDB
@@ -125,6 +126,7 @@ All runtime state (index, memory DB, skills) is stored under `.clearcode/` in th
 | `/plan <goal>` | Generate, approve, and execute an autonomous multi-step plan |
 | `/task_status` | Show progress table for the active project |
 | `/show_index` | Dump all indexed chunks |
+| `/reindex` | Force a full incremental re-index of the current directory |
 | `/new_session` | Start a fresh conversation |
 | `/switch <session_id>` | Resume a past session |
 | `/session` | Show current session ID |
@@ -133,9 +135,10 @@ All runtime state (index, memory DB, skills) is stored under `.clearcode/` in th
 ## Architecture Notes
 
 - **Chunking**: `code_parser.py` uses tree-sitter for AST-aware chunking across 15 languages. Falls back to a sliding window (50 lines, 10-line overlap) for text/config files and files with no extractable AST blocks. tree-sitter returns byte offsets — all slicing is done on `source_bytes` (not the decoded `str`) to avoid truncation with multi-byte characters.
-- **Indexing**: ChromaDB uses stable chunk IDs (`source::name::start_line`) for idempotent upserts. Qdrant backends use `from_documents()` and check `points_count` to skip re-indexing on startup. All three backends accept a `force=True` parameter that bypasses the skip-if-exists guard — used after `/plan` so newly generated files are immediately queryable via `/ask`.
+- **Indexing**: ChromaDB uses stable chunk IDs (`source::name::start_line`) for idempotent upserts and mtime-based incremental indexing — unchanged files are skipped entirely, changed files have old chunks deleted before re-embedding, deleted files are pruned. Qdrant backends use `from_documents()` and check `points_count` to skip re-indexing on startup.
+- **Watcher**: `watcher.py` starts a `watchdog` FSEvents/inotify observer in a background daemon thread. File create/modify/delete/rename events are debounced per-file (1.5 s) then dispatched to `index_single_file()` or `remove_file_from_index()` via `factory.get_single_file_indexer()` / `get_file_remover()` — so the right backend is used regardless of which provider is configured. This keeps the index current in real time without a full re-scan.
 - **Hybrid RAG**: `hybrid_qdrant.py` stores both dense (OpenAI `text-embedding-3-small`) and sparse (BM25 via `fastembed`) vectors per chunk. `retrieval_mode` in config controls whether queries use dense, sparse, or hybrid fusion at retrieval time.
-- **Factory dispatch**: `indexers/factory.py` and `retrievers/factory.py` select the backend based on `config["rag"]["mode"]` and `config["vector_store"]["provider"]`. Adding a new backend requires a new `*_<backend>.py` pair and a branch in each factory.
+- **Factory dispatch**: `indexers/factory.py` and `retrievers/factory.py` select the backend based on `config["rag"]["mode"]` and `config["vector_store"]["provider"]`. Four dispatcher functions: `get_indexer()`, `get_index_inspector()`, `get_single_file_indexer()`, `get_file_remover()`. Adding a new backend requires a new `*_<backend>.py` pair and a branch in each dispatcher.
 - **Agent**: `factory.py` builds an async `create_agent` with local tools (search, terminal), MCP tools loaded at startup, and a `load_skill` tool for progressive skill disclosure. The system prompt is built dynamically — it includes MCP tool names/descriptions and a skills index (name + when_to_use) so the LLM knows what's available without paying the token cost of full skill bodies. Filesystem operations are delegated entirely to the filesystem MCP server.
 - **Skills**: `SkillRegistry` scans `.clearcode/skills/` at startup. Each skill is a folder with a `SKILL.md` (YAML frontmatter + instruction body). The agent sees a compact metadata summary in the system prompt (Tier 1), loads the full body via `load_skill` on demand (Tier 2), and reads individual support files via `read_file` if needed (Tier 3).
 - **MCP**: `clearcode_mcp_servers.json` defines MCP servers. `clearcode_mcp_config.py` resolves `${ENV_VAR}` and `${CWD}` placeholders — `${CWD}` is injected at load time so it always resolves to the directory where clearcode was launched. Two servers are configured by default: GitHub (unauthenticated for public repos; set `GITHUB_TOKEN` in `.env` for private repos and write access) and filesystem (scoped to CWD).

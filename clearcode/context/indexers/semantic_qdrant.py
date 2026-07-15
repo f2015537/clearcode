@@ -12,7 +12,7 @@ from clearcode.observability.logger import get_logger
 logger = get_logger(__name__)
 
 
-def index_codebase(repo_path: str, force: bool = False) -> QdrantVectorStore:
+def index_codebase(repo_path: str) -> QdrantVectorStore:
     """
     Parse all source files in repo_path, embed each chunk and store in Qdrant.
     Returns the QdrantVectorStore. Skips indexing if collection already has data
@@ -26,7 +26,7 @@ def index_codebase(repo_path: str, force: bool = False) -> QdrantVectorStore:
     # Check if collection already has data
     client = QdrantClient(url=url, api_key=api_key)
     existing = [c.name for c in client.get_collections().collections]
-    if not force and collection_name in existing:
+    if collection_name in existing:
         info = client.get_collection(collection_name)
         if info.points_count > 0:
             logger.info(f"Loaded existing index with {info.points_count} chunks")
@@ -74,6 +74,65 @@ def index_codebase(repo_path: str, force: bool = False) -> QdrantVectorStore:
 
     logger.info(f"Semantic indexing complete. Total chunks: {len(docs)}")
     return vector_store
+
+
+def index_single_file(filepath: str) -> None:
+    """Reindex one file — called by the watchdog handler on create/modify."""
+    if not os.path.exists(filepath):
+        return
+    collection_name = config["qdrant"]["collection_name"]
+    url     = os.getenv("QDRANT_URL")
+    api_key = os.getenv("QDRANT_API_KEY")
+    client  = QdrantClient(url=url, api_key=api_key)
+
+    from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+    client.delete(
+        collection_name=collection_name,
+        points_selector=Filter(
+            must=[FieldCondition(key="metadata.source", match=MatchValue(value=filepath))]
+        ),
+    )
+
+    try:
+        chunks = parse_file(filepath)
+    except (SyntaxError, ValueError) as e:
+        logger.error(f"Skipping {filepath}: {e}")
+        return
+
+    if not chunks:
+        return
+
+    embedder = get_embedder()
+    docs = [
+        Document(
+            page_content=c.content,
+            metadata={"source": c.source, "name": c.name, "type": c.type,
+                      "start_line": c.start_line, "end_line": c.end_line},
+        )
+        for c in chunks
+    ]
+    QdrantVectorStore.from_documents(
+        docs, embedder, url=url, api_key=api_key,
+        collection_name=collection_name, batch_size=50,
+    )
+    logger.info(f"Watchdog indexed {filepath} → {len(chunks)} chunks")
+
+
+def remove_file_from_index(filepath: str) -> None:
+    """Remove all chunks for a deleted file — called by the watchdog handler."""
+    collection_name = config["qdrant"]["collection_name"]
+    url     = os.getenv("QDRANT_URL")
+    api_key = os.getenv("QDRANT_API_KEY")
+    client  = QdrantClient(url=url, api_key=api_key)
+
+    from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+    client.delete(
+        collection_name=collection_name,
+        points_selector=Filter(
+            must=[FieldCondition(key="metadata.source", match=MatchValue(value=filepath))]
+        ),
+    )
+    logger.info(f"Watchdog removed {filepath} from index")
 
 
 def show_index(vector_store: QdrantVectorStore) -> None:

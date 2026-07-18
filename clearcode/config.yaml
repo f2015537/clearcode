@@ -1,6 +1,7 @@
 embeddings:
   provider: openai
   model: text-embedding-3-small
+  dims: 1536
 
 rag:
   mode: semantic # semantic | hybrid
@@ -35,3 +36,9 @@ skills:
 
 tasks:
   db_path: .clearcode/tasks/tasks.db
+
+semantic_cache:
+  enabled: true
+  redis_url: redis://localhost:6379
+  threshold: 0.85
+  ttl: 86400 # 24 hours

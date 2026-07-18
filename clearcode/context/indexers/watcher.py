@@ -27,8 +27,9 @@ logger = get_logger(__name__)
 # emit multiple events per save) → calls the right index_single_file()
 # or remove_file_from_index() for the active backend via factory.py.
 #
-# This keeps ChromaDB up-to-date in real time so /ask queries reflect
-# changes made by /plan tasks or manual edits without needing a restart.
+# This keeps the active index backend up-to-date in real time so /ask
+# queries reflect changes made by /plan tasks or manual edits without
+# needing a restart.
 # ------------------------------------------------------------------
 
 
@@ -75,11 +76,11 @@ class _CodebaseEventHandler(FileSystemEventHandler):
    """
 
 
-   def __init__(self) -> None:
+   def __init__(self, on_change = None) -> None:
        # {filepath: threading.Timer} — one pending debounced call per file.
        # Timers are daemon threads so they don't block process exit.
        self._timers: dict[str, threading.Timer] = {}
-
+       self.on_change = on_change
 
    def _is_indexable(self, path: str) -> bool:
        """True if the file extension is one the indexer knows how to parse."""
@@ -116,6 +117,8 @@ class _CodebaseEventHandler(FileSystemEventHandler):
            get_file_remover()(filepath)
        else:
            get_single_file_indexer()(filepath)
+       if self.on_change is not None:
+           self.on_change()
 
 
    # ── watchdog event hooks ──────────────────────────────────────────
@@ -148,7 +151,7 @@ class _CodebaseEventHandler(FileSystemEventHandler):
 
 
 
-def start_watcher(repo_path: str) -> Observer:
+def start_watcher(repo_path: str, on_change = None) -> Observer:
    """
    Start a filesystem observer on repo_path in a background daemon thread.
 
@@ -157,10 +160,13 @@ def start_watcher(repo_path: str) -> Observer:
    Daemon=True means the thread won't prevent the process from exiting
    if the user hits Ctrl+C without going through /exit.
 
+   on_change, if given, is called (with no args) after every debounced
+   index update - used to invalidate the semantic cache when the
+   underlying codebase changes.
 
    Returns the Observer so the caller can call stop_watcher() on shutdown.
    """
-   handler  = _CodebaseEventHandler()
+   handler  = _CodebaseEventHandler(on_change=on_change)
    observer = _get_observer()
    observer.schedule(handler, repo_path, recursive=True)
    observer.daemon = True

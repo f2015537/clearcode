@@ -42,6 +42,8 @@ Five capabilities are live. All examples below are real output run against actua
 
 **Autonomous task execution** — describe a goal, review the plan, and the agent implements it end-to-end: structured plan generation, human-in-the-loop approval, serial execution with dependency resolution, LLM-as-judge verification per task, and automatic retry.
 
+**Semantic caching** — repeated or semantically similar `/ask` queries are served from a Redis vector cache without touching the LLM or running any tool calls. Cache entries are scoped per repo and per model, and invalidated automatically when any source file changes or `/reindex` runs.
+
 ---
 
 **Dense retrieval** — semantic similarity. Best for conceptual and design questions where exact wording doesn't match the source.
@@ -304,6 +306,33 @@ Each task runs in its own agent instance with a least-privilege tool set. An LLM
 
 ---
 
+**Semantic caching** — repeated or similar `/ask` queries skip the LLM entirely and return from Redis in milliseconds.
+
+```
+> /ask What does index_codebase do?
+
+Searching for: What does index_codebase do?...
+
+index_codebase scans all source files in the repo, parses them with tree-sitter
+for AST-aware chunking, and upserts the resulting chunks into the configured
+vector store backend. On startup and /reindex it skips files whose mtime hasn't
+changed, so only new or modified files are re-embedded.
+
+> /ask Can you explain what index_codebase does?
+
+Searching for: Can you explain what index_codebase does?...
+⚡ cache hit
+
+index_codebase scans all source files in the repo, parses them with tree-sitter
+for AST-aware chunking, and upserts the resulting chunks into the configured
+vector store backend. On startup and /reindex it skips files whose mtime hasn't
+changed, so only new or modified files are re-embedded.
+```
+
+The second query is phrased differently but semantically equivalent. The embeddings land above the similarity threshold (0.85 cosine by default), so the stored answer is returned without calling the LLM or running any retrieval tools. Cache entries are scoped per repo and invalidated automatically when a file changes or `/reindex` runs.
+
+---
+
 | Command | Description |
 |---------|-------------|
 | `/ask <question>` | Ask a question about the indexed codebase |
@@ -341,6 +370,9 @@ clearcode/
 │   ├── orchestrator.py   # Dependency loop, retry, re-index after run
 │   └── recovery.py       # Reset crashed IN_PROGRESS tasks on restart
 │
+├── cache/                # Semantic cache — built
+│   └── semantic_cache.py # Redis HNSW index; per-repo domain, auto-invalidation
+│
 ├── tools/                # Local LangChain tools (search, terminal)
 ├── llm/                  # LLM + embedder provider abstraction
 ├── observability/        # Structured logging
@@ -373,7 +405,46 @@ The context layer is the foundation everything else builds on. Getting it right 
 
 The ChromaDB backend tracks each file's `mtime` in chunk metadata. On startup and `/reindex`, it skips unchanged files, re-embeds changed files (deleting old chunks first), and prunes chunks for deleted files — so repeated runs are fast and cost nothing for files that haven't changed.
 
+```
+# First run — nothing indexed yet, all files embedded
+$ clearcode
+Checking index for /path/to/your/project...
+LLM: openai / gpt-4o
+Embedder: openai / text-embedding-3-small
+Semantic cache: enabled (threshold=0.85)
+✓ Ready
+
+# Second run — same directory, no files changed
+$ clearcode
+Checking index for /path/to/your/project...   ← skips all 214 files (mtime unchanged)
+LLM: openai / gpt-4o
+Embedder: openai / text-embedding-3-small
+Semantic cache: enabled (threshold=0.85)
+✓ Ready
+
+# After editing two files, trigger a manual re-index
+> /reindex
+
+Re-indexing current directory...              ← re-embeds 2 changed files, skips 212
+Semantic cache invalidated for this repo.
+✓ Re-index complete.
+```
+
 **Real-time watcher** — A `watchdog` filesystem observer runs in a background thread from the moment the REPL starts. When any source file is created, modified, renamed, or deleted, the watcher debounces the event (1.5 s) and calls the correct backend's `index_single_file()` or `remove_file_from_index()` via the factory. The index stays current without any manual command — including files written by `/plan` tasks mid-execution.
+
+```
+# A new utility is added to the codebase (by hand or by /plan)
+$ echo "def retry(fn, n=3): ..." >> utils/retry.py
+
+# 1.5 s later the watcher picks it up — no /reindex needed
+> /ask Does this codebase have any retry utilities?
+
+Yes — utils/retry.py defines a retry() helper. It takes a callable fn and an
+integer n (default 3) and re-invokes fn up to n times before propagating the
+exception. It was just added to the codebase.
+```
+
+The watcher fires for every backend — ChromaDB, Qdrant semantic, and Qdrant hybrid — through the same factory dispatch. Saving a file in one terminal window is reflected in the next `/ask` in the REPL without restarting or running any command.
 
 **Hybrid retrieval** — The Qdrant hybrid backend stores two vector representations per chunk: a dense embedding from `text-embedding-3-small` capturing semantic meaning, and a sparse BM25 vector capturing exact keyword overlap. At query time, both are scored and fused. This catches cases where pure semantic search misses exact identifiers or rare terms, and where keyword search misses conceptually related code.
 
@@ -410,6 +481,7 @@ Full series index: [blog.divyampatro.dev/series/clearcode](https://blog.divyampa
 | Sparse embeddings | BM25 via fastembed |
 | Code parsing | tree-sitter · tree-sitter-languages (15 languages) |
 | Memory | LangGraph `AsyncSqliteSaver` + summarization middleware |
+| Semantic cache | Redis + RedisVL (HNSW vector index, cosine similarity) |
 | Tool protocol | MCP via `langchain-mcp-adapters` (GitHub + filesystem servers) |
 | Evaluation | RAGAS · custom retrieval metrics (upcoming) |
 

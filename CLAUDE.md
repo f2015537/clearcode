@@ -8,7 +8,7 @@ ClearCode is a build-in-public project to reverse-engineering a production-grade
 
 ## Current State
 
-The context, agent, memory, MCP, skills, and tasks layers are implemented and wired together. Three vector store backends are supported (ChromaDB, Qdrant semantic, Qdrant hybrid), all switchable via config. The agent is fully async, connects to MCP servers at startup, and supports a progressive-disclosure skills system. The tasks layer adds autonomous multi-step plan execution: the LLM produces a structured `ExecutionPlan`, the user approves it, and an orchestrator executes tasks serially with dependency resolution, retry logic, and an LLM-as-judge per task.
+The context, agent, memory, MCP, skills, tasks, and semantic cache layers are implemented and wired together. Three vector store backends are supported (ChromaDB, Qdrant semantic, Qdrant hybrid), all switchable via config. The agent is fully async, connects to MCP servers at startup, and supports a progressive-disclosure skills system. The tasks layer adds autonomous multi-step plan execution: the LLM produces a structured `ExecutionPlan`, the user approves it, and an orchestrator executes tasks serially with dependency resolution, retry logic, and an LLM-as-judge per task. A Redis-backed semantic cache deduplicates repeated `/ask` queries by similarity, skipping the agent entirely on cache hits.
 
 ```
 clearcode/
@@ -53,6 +53,8 @@ clearcode/
 │   ├── executor.py                    # run_subtask_agent() — per-task agent + LLM-as-judge
 │   ├── orchestrator.py                # TaskOrchestrator + handle_plan_command() — dependency loop, recovery
 │   └── recovery.py                    # RecoveryManager — resets IN_PROGRESS → PENDING on restart
+├── cache/
+│   └── semantic_cache.py              # Redis + RedisVL semantic similarity cache for /ask responses
 └── observability/
     └── logger.py                      # Root logger at WARNING, clearcode loggers at DEBUG
 ```
@@ -86,6 +88,7 @@ llm:
 embeddings:
   provider: openai   # openai | huggingface
   model: text-embedding-3-small
+  dims: 1536         # must match the embedding model's output dimension
 
 rag:
   mode: semantic     # semantic | hybrid
@@ -108,6 +111,12 @@ memory:
 
 skills:
   skills_dir: .clearcode/skills
+
+semantic_cache:
+  enabled: true
+  redis_url: redis://localhost:6379
+  threshold: 0.85    # cosine similarity — queries above this reuse the cached answer
+  ttl: 86400         # seconds before a cache entry expires (0 = no expiry)
 ```
 
 All runtime state (index, memory DB, skills) is stored under `.clearcode/` in the CWD. API keys go in `.env` at the repo root (gitignored). `load_dotenv()` in `main.py` is called before all `clearcode.*` imports using an explicit path relative to `__file__`. Qdrant requires `QDRANT_URL` and `QDRANT_API_KEY` in `.env`.
@@ -143,6 +152,7 @@ All runtime state (index, memory DB, skills) is stored under `.clearcode/` in th
 - **Skills**: `SkillRegistry` scans `.clearcode/skills/` at startup. Each skill is a folder with a `SKILL.md` (YAML frontmatter + instruction body). The agent sees a compact metadata summary in the system prompt (Tier 1), loads the full body via `load_skill` on demand (Tier 2), and reads individual support files via `read_file` if needed (Tier 3).
 - **MCP**: `clearcode_mcp_servers.json` defines MCP servers. `clearcode_mcp_config.py` resolves `${ENV_VAR}` and `${CWD}` placeholders — `${CWD}` is injected at load time so it always resolves to the directory where clearcode was launched. Two servers are configured by default: GitHub (unauthenticated for public repos; set `GITHUB_TOKEN` in `.env` for private repos and write access) and filesystem (scoped to CWD).
 - **Tasks layer**: `planner.py` calls the LLM with `response_format=ExecutionPlan` (structured output) to produce a typed DAG of `PlannedTask` objects. `approval.py` renders the plan as a Rich table and loops until the user approves (A), modifies (M), or rejects (R). `task_store.py` persists the approved plan to SQLite (WAL mode) and manages all state transitions atomically. `executor.py` builds a fresh agent per task with a least-privilege tool set keyed on `task_type`, then runs an LLM-as-judge to verify the output against `acceptance_criteria` before marking the task complete. `orchestrator.py` loops over ready tasks (all deps completed/skipped), dispatches them serially, and handles retries via `fail_task`'s SQL CASE logic. `recovery.py` resets any `IN_PROGRESS` tasks to `PENDING` on restart so crashed runs can resume cleanly.
+- **Semantic cache**: `semantic_cache.py` stores `(query_vector, response)` pairs in a Redis HNSW index (via RedisVL). On each `/ask`, `handle_query` embeds the query and checks for a match above `threshold` (cosine similarity) before invoking the agent — a hit skips all LLM and tool calls entirely. Entries are keyed by `domain` (SHA-256 of `repo_path`) and `model` tag, so caches from different repos or different LLM configs never cross-pollinate. When any file changes (watcher fires) or `/reindex` runs, `invalidate_domain()` finds all domain-tagged entries via a `FilterQuery` and bulk-deletes them. The watcher callback runs via `asyncio.run_coroutine_threadsafe` since the watchdog timer fires in a background daemon thread. `handle_query` returns `(answer, from_cache: bool)` so `main.py` can print `⚡ cache hit` on hits.
 
 ## Tasks Layer Config
 

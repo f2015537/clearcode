@@ -95,7 +95,9 @@ async def _run_async():
                     question = user_input.removeprefix("/ask ").strip()
                     logger.info(f"Ask command received: {question}")
                     console.print(f"[dim]Searching for: {question}...[/dim]")
-                    response = await handle_query(agent, question, session_id, semantic_cache, cache_domain)
+                    response, from_cache = await handle_query(agent, question, session_id, semantic_cache, cache_domain)
+                    if from_cache:
+                        console.print("[dim]⚡ cache hit[/dim]")
                     console.print(response)
                 elif user_input == "/reindex":
                     console.print("[dim]Re-indexing current directory...[/dim]")

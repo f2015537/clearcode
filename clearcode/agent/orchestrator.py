@@ -10,7 +10,7 @@ async def handle_query(
     thread_id: str,
     semantic_cache=None,
     cache_domain: str | None = None,
-) -> str:
+) -> tuple[str, bool]:
     """Entry point for all user queries - invokes the agent.
 
     When semantic_cache/cache_domain are provided, a cache hit returns the
@@ -18,6 +18,7 @@ async def handle_query(
     have made, including search_codebase) entirely. A miss falls through to
     the normal agent call and stores the fresh answer for next time.
 
+    Returns (answer, from_cache) so callers can display a cache-hit indicator.
     """
     logger.info(f"Handling query for session {thread_id}: {question}")
     model = config["llm"]["model"]
@@ -31,7 +32,7 @@ async def handle_query(
             cached_response = None
         if cached_response is not None:
             logger.info("Semantic cache HIT - skipping agent/tool calls")
-            return cached_response
+            return cached_response, True
 
     agent_config = {"configurable": {"thread_id": thread_id}}
     try:
@@ -41,7 +42,7 @@ async def handle_query(
         answer = response["messages"][-1].content
     except Exception as e:
         logger.error(f"Agent error: {e}")
-        return f"Error: {e}"
+        return f"Error: {e}", False
 
     if semantic_cache is not None and cache_domain is not None:
         try:
@@ -50,6 +51,6 @@ async def handle_query(
         except Exception as e:
             logger.warning(f"Semantic cache store failed: {e}")
 
-    return answer
+    return answer, False
 
     

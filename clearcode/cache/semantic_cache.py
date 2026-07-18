@@ -127,7 +127,7 @@ class SemanticCache:
        results = await self.index.query(fq)
        if not results:
            return
-       keys = [self.index.key(r["id"]) for r in results]
+       keys = [r["id"] for r in results]
        await self.client.delete(*keys)
        logger.info(f"Invalidated {len(keys)} cache entries for domain {domain}")
 

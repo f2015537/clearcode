@@ -466,6 +466,7 @@ Full series index: [blog.divyampatro.dev/series/clearcode](https://blog.divyampa
 | 2 | [Context layer: AST-aware indexing, vector stores, and hybrid retrieval](https://blog.divyampatro.dev/clearcode-part-2-ast-aware-indexing-vector-stores-and-hybrid-retrieval) | Published |
 | 3 | [Memory, MCP, and skills: turning a RAG pipeline into an autonomous coding agent](https://blog.divyampatro.dev/clearcode-part-3-memory-agent-reasoning-skills-and-mcp) | Published |
 | 4 | [Tasks layer: autonomous plan execution, LLM-as-judge, and human-in-the-loop approval](https://blog.divyampatro.dev/clearcode-part-4-autonomous-plan-execution-llm-as-judge-and-human-in-the-loop-approval) | Published |
+| 5 | [Semantic caching, incremental indexing, and the hardest part of caching](https://blog.divyampatro.dev/clearcode-part-5-semantic-caching-incremental-indexing-and-the-hardest-part-of-caching) | Published |
 
 ---
 
